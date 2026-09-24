@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Fishbowl Manager{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background-color: #f5f6f8;
+        }
+        
+        .sidebar {
+            min-height: 100vh;
+            background-color: #212529;
+            padding: 20px;
+        }
+        
+        .sidebar-title {
+            color: white;
+            margin-bottom: 5px;
+        }
+        
+        .sidebar-subtitle {
+            color: #adb5bd;
+            font-size: 13px;
+            margin-bottom: 25px;
+        }
+        
+        .sidebar a {
+            display: block;
+            color: #adb5bd;
+            text-decoration: none;
+            padding: 12px 15px;
+            margin-bottom: 5px;
+            border-radius: 6px;
+        }
+        
+        .sidebar a:hover {
+            background-color: #343a40;
+            color: white;
+        }
+        
+        .main-content {
+            padding: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-2 sidebar">
+                <h4 class="sidebar-title">Fishbowl</h4>
+                <div class="sidebar-subtitle">MANAGER PANEL</div>
+                <a href="admin_panel.html">Dashboard</a>
+                <a href="#">Order Queue</a>
+                <a href="#">Machine Monitor</a>
+                <a href="#">Ingredients</a>
+                <a href="#">Menu &amp; Recipes</a>
+                <a href="#">Customers</a>
+                <a href="#">Reports</a>
+                <a href="#">Settings</a>
+            </div>
+            <main class="col-md-10 main-content">
+                {% block content %} {% endblock %}
+            </main>
+        </div>
+    </div>
+</body>
+
+</html>
