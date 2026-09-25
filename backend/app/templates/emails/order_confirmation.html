@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block content %}
+<p>Hi {{ name }}, thanks for your order!</p>
+<p><strong>Order #{{ order.order_number }}</strong>{% if order.table %} &middot; Table {{ order.table.number }}{% endif %}</p>
+<table width="100%" cellpadding="4">
+{% for line in order["items"] %}<tr><td>{{ line.quantity }} &times; {{ line.name }}</td><td align="right">{{ line.line_total_cents | money }}</td></tr>{% endfor %}
+<tr><td>Tax</td><td align="right">{{ order.pricing.tax_cents | money }}</td></tr>
+{% if order.pricing.discount_cents %}<tr><td>Points discount</td><td align="right">-{{ order.pricing.discount_cents | money }}</td></tr>{% endif %}
+<tr><td><strong>Total</strong></td><td align="right"><strong>{{ currency }} {{ order.pricing.total_cents | money }}</strong></td></tr>
+</table>
+<p><a href="{{ track_link }}">Track your order</a></p>
+{% endblock %}
