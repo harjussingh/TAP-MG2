@@ -1,0 +1,27 @@
+# --- Web framework ---
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+pydantic-settings==2.6.1
+email-validator==2.2.0
+python-multipart==0.0.19
+
+# --- Database ---
+motor==3.6.0
+pymongo==4.9.2
+
+# --- Cache / rate-limit / multi-worker WebSocket fan-out (optional at runtime) ---
+redis==5.2.1
+
+# --- Auth & security ---
+PyJWT==2.10.1
+bcrypt==4.2.1
+
+# --- Email ---
+aiosmtplib==3.0.2
+Jinja2==3.1.4
+
+# --- Integrations ---
+httpx==0.28.1
+stripe==11.3.0
+qrcode[pil]==8.0
