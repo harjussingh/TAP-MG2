@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block content %}
+<p>Hi {{ name }},</p>
+<p>Your order <strong>#{{ order_number }}</strong> is ready{% if table %} and on its way to table {{ table }}{% else %} for pickup{% endif %}. Enjoy!</p>
+{% endblock %}
