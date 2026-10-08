@@ -1,0 +1,106 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Dashboard | Fishbowl Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="admin_panel.css">
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <aside class="col-md-2 sidebar">
+                <h4 class="sidebar-title">Fishbowl</h4>
+                <div class="sidebar-subtitle">MANAGER PANEL</div>
+                <a href="admin_panel.html" class=active>Dashboard</a>
+                <a href="orders.html">Order Queue</a>
+                <a href="machine_monitor.html">Machine Monitor</a>
+                <a href="ingredients.html">Ingredients</a>
+                <a href="menu_recipes.html">Menu & Recipes</a>
+                <a href="customers.html">Customers</a>
+                <a href="reports.html">Reports</a>
+                <a href="settings.html">Settings</a>
+            </aside>
+            <main class="col-md-10 main-content">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h2 class="page-title">Dashboard</h2>
+                        <p class="text-muted mb-0">Restaurant operations overview</p>
+                    </div>
+                    <span class="badge bg-success">System Online</span>
+                </div>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card manager-card">
+                            <div class="card-body">
+                                <p class="text-muted mb-1">Orders Today</p>
+                                <h3>13</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card manager-card">
+                            <div class="card-body">
+                                <p class="text-muted mb-1">Revenue</p>
+                                <h3>A$216.23</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card manager-card">
+                            <div class="card-body">
+                                <p class="text-muted mb-1">Avg Prep Time</p>
+                                <h3>8m 14s</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card manager-card">
+                            <div class="card-body">
+                                <p class="text-muted mb-1">Machine Status</p>
+                                <h3>99.1%</h3><small class="text-success">Operational</small></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card manager-card">
+                    <div class="card-header bg-white py-3"><strong>Live Order Feed</strong></div>
+                    <div class="card-body p-0">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Item</th>
+                                    <th>Type</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>RBM-2871</td>
+                                    <td>Custom Fishbowl</td>
+                                    <td>Dine-in</td>
+                                    <td>A$14.50</td>
+                                    <td><span class="badge bg-warning text-dark">Preparing</span></td>
+                                </tr>
+                                <tr>
+                                    <td>RBM-2872</td>
+                                    <td>Mediterranean Harvest</td>
+                                    <td>Takeaway</td>
+                                    <td>A$13.50</td>
+                                    <td><span class="badge bg-success">Ready</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+
+</html>

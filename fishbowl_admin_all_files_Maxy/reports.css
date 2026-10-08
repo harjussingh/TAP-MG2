@@ -1,0 +1,13 @@
+
+body{margin:0;background:#f5f6f8;font-family:Arial,sans-serif}
+.sidebar{min-height:100vh;background:#212529;padding:24px 18px}
+.sidebar-title{color:#fff;font-weight:bold;margin-bottom:4px}
+.sidebar-subtitle{color:#868e96;font-size:12px;letter-spacing:1px;margin-bottom:25px}
+.sidebar a{display:block;color:#adb5bd;text-decoration:none;padding:11px 14px;margin-bottom:6px;border-radius:7px;transition:.2s}
+.sidebar a:hover,.sidebar a.active{background:#343a40;color:#fff}
+.main-content{padding:30px}
+.page-title{font-weight:600;color:#212529}
+.manager-card{border:none;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.table th{white-space:nowrap}
+
+.report-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #eee}.report-row:last-child{border-bottom:0}

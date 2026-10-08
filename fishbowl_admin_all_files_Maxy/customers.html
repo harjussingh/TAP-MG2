@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customers | Fishbowl Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="customers.css">
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <aside class="col-md-2 sidebar">
+                <h4 class="sidebar-title">Fishbowl</h4>
+                <div class="sidebar-subtitle">MANAGER PANEL</div>
+                <a href="admin_panel.html">Dashboard</a>
+                <a href="orders.html">Order Queue</a>
+                <a href="machine_monitor.html">Machine Monitor</a>
+                <a href="ingredients.html">Ingredients</a>
+                <a href="menu_recipes.html">Menu & Recipes</a>
+                <a href="customers.html" class=active>Customers</a>
+                <a href="reports.html">Reports</a>
+                <a href="settings.html">Settings</a>
+            </aside>
+            <main class="col-md-10 main-content">
+
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h2 class="page-title">Customers</h2>
+                        <p class="text-muted mb-0">View registered members and customer information.</p>
+                    </div>
+                    <button class="btn btn-primary">+ Create User</button>
+                </div>
+                <div class="card manager-card">
+                    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                        <strong>Customer Accounts</strong><input class="form-control search-box" placeholder="Search customer">
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>User ID</th>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Membership</th>
+                                        <th>Loyalty Points</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>U1001</td>
+                                        <td>Alex Chen</td>
+                                        <td>alex@example.com</td>
+                                        <td>Member</td>
+                                        <td>180</td>
+                                        <td><span class="badge bg-success">Active</span></td>
+                                        <td><button class="btn btn-sm btn-outline-primary">View</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>U1002</td>
+                                        <td>Sarah Lee</td>
+                                        <td>sarah@example.com</td>
+                                        <td>Member</td>
+                                        <td>95</td>
+                                        <td><span class="badge bg-success">Active</span></td>
+                                        <td><button class="btn btn-sm btn-outline-primary">View</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-muted small mt-3">This page can later connect to the existing admin users endpoints.</p>
+
+            </main>
+        </div>
+    </div>
+</body>
+
+</html>

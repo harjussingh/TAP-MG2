@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reports | Fishbowl Manager</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="reports.css">
+</head>
+<body>
+<div class="container-fluid"><div class="row">
+<aside class="col-md-2 sidebar">
+<h4 class="sidebar-title">Fishbowl</h4>
+<div class="sidebar-subtitle">MANAGER PANEL</div>
+<a href="admin_panel.html">Dashboard</a><a href="orders.html">Order Queue</a><a href="machine_monitor.html">Machine Monitor</a><a href="ingredients.html">Ingredients</a><a href="menu_recipes.html">Menu & Recipes</a><a href="customers.html">Customers</a><a href="reports.html" class=active>Reports</a><a href="settings.html">Settings</a>
+</aside>
+<main class="col-md-10 main-content">
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+<div><h2 class="page-title">Reports</h2><p class="text-muted mb-0">Review sales and operational performance.</p></div>
+<button class="btn btn-outline-primary">Export Orders CSV</button>
+</div>
+<div class="row g-3 mb-4">
+<div class="col-md-3"><div class="card manager-card"><div class="card-body"><p class="text-muted mb-1">Revenue Today</p><h3>A$216.23</h3></div></div></div>
+<div class="col-md-3"><div class="card manager-card"><div class="card-body"><p class="text-muted mb-1">Orders Today</p><h3>13</h3></div></div></div>
+<div class="col-md-3"><div class="card manager-card"><div class="card-body"><p class="text-muted mb-1">Avg Order Value</p><h3>A$16.63</h3></div></div></div>
+<div class="col-md-3"><div class="card manager-card"><div class="card-body"><p class="text-muted mb-1">Avg Prep Time</p><h3>8m 14s</h3></div></div></div>
+</div>
+<div class="row g-3">
+<div class="col-md-6"><div class="card manager-card h-100"><div class="card-header bg-white"><strong>Top Ingredients</strong></div><div class="card-body">
+<div class="report-row"><span>Grilled Chicken</span><strong>42 orders</strong></div><div class="report-row"><span>Jasmine Rice</span><strong>38 orders</strong></div><div class="report-row"><span>Teriyaki Salmon</span><strong>31 orders</strong></div>
+</div></div></div>
+<div class="col-md-6"><div class="card manager-card h-100"><div class="card-header bg-white"><strong>Order Type Split</strong></div><div class="card-body">
+<div class="report-row"><span>Dine-in</span><strong>61%</strong></div><div class="report-row"><span>Takeaway</span><strong>39%</strong></div>
+</div></div></div>
+</div>
+<p class="text-muted small mt-3">Prototype metrics are sample data. CSV export can later connect to the existing admin report endpoint.</p>
+
+</main>
+</div></div>
+</body>
+</html>

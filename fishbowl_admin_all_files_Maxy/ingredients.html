@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ingredients | Fishbowl Manager</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="ingredients.css">
+</head>
+<body>
+<div class="container-fluid"><div class="row">
+<aside class="col-md-2 sidebar">
+<h4 class="sidebar-title">Fishbowl</h4>
+<div class="sidebar-subtitle">MANAGER PANEL</div>
+<a href="admin_panel.html">Dashboard</a><a href="orders.html">Order Queue</a><a href="machine_monitor.html">Machine Monitor</a><a href="ingredients.html" class=active>Ingredients</a><a href="menu_recipes.html">Menu & Recipes</a><a href="customers.html">Customers</a><a href="reports.html">Reports</a><a href="settings.html">Settings</a>
+</aside>
+<main class="col-md-10 main-content">
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+<div><h2 class="page-title">Ingredients</h2><p class="text-muted mb-0">Monitor ingredient availability and stock levels.</p></div>
+<button class="btn btn-primary">+ Add Ingredient</button>
+</div>
+<div class="row g-3 mb-4">
+<div class="col-md-4"><div class="card manager-card"><div class="card-body"><p class="text-muted mb-1">Total Ingredients</p><h3>24</h3></div></div></div>
+<div class="col-md-4"><div class="card manager-card"><div class="card-body"><p class="text-muted mb-1">Low Stock</p><h3>3</h3></div></div></div>
+<div class="col-md-4"><div class="card manager-card"><div class="card-body"><p class="text-muted mb-1">Unavailable</p><h3>1</h3></div></div></div>
+</div>
+<div class="card manager-card"><div class="card-header bg-white py-3"><strong>Ingredient Inventory</strong></div>
+<div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0">
+<thead class="table-light"><tr><th>Ingredient</th><th>Type</th><th>Stock</th><th>Extra Price</th><th>Status</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td>Jasmine Rice</td><td>Base</td><td>12 kg</td><td>A$0.00</td><td><span class="badge bg-success">Available</span></td><td><button class="btn btn-sm btn-outline-primary">Edit</button></td></tr>
+<tr><td>Teriyaki Salmon</td><td>Protein</td><td>2 kg</td><td>A$3.50</td><td><span class="badge bg-warning text-dark">Low Stock</span></td><td><button class="btn btn-sm btn-outline-primary">Edit</button></td></tr>
+<tr><td>Crispy Tofu</td><td>Protein</td><td>0 kg</td><td>A$2.00</td><td><span class="badge bg-danger">Unavailable</span></td><td><button class="btn btn-sm btn-outline-primary">Edit</button></td></tr>
+</tbody></table></div></div></div>
+<p class="text-muted small mt-3">Prototype UI: inventory values are sample data until an ingredient API is connected.</p>
+
+</main>
+</div></div>
+</body>
+</html>
