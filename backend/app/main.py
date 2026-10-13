@@ -3,11 +3,13 @@ import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import (admin, admin_menu, auth, cart, kitchen, loyalty, menu, orders, payments, recipes,
                             reviews, staff, tables, users, ws)
@@ -77,6 +79,15 @@ async def unhandled_error(request: Request, exc: Exception):
 for r in (auth, users, tables, menu, cart, orders, payments, reviews, recipes, loyalty, staff, kitchen,
           admin_menu, admin, ws):
     app.include_router(r.router, prefix=P)
+
+
+# Staff + manager panel at http://localhost:8000/panel/ (same origin, so no CORS setup is needed).
+# Serves the Flutter build (flutter_panel/build/web); falls back to the old HTML panel if it hasn't been built.
+_ROOT = Path(__file__).resolve().parent.parent
+_PANEL_DIR = next((d for d in (_ROOT / "flutter_panel" / "build" / "web", _ROOT / "frontend") if (d / "index.html").is_file()),
+                  None)
+if _PANEL_DIR is not None:
+    app.mount("/panel", StaticFiles(directory=str(_PANEL_DIR), html=True), name="panel")
 
 
 @app.get("/", tags=["Health"])

@@ -67,6 +67,8 @@ erDiagram
 | `password_hash` | string | bcrypt; never returned by the API |
 | `full_name` | string | |
 | `phone` | string \| null | |
+| `date_of_birth` | string \| null | `YYYY-MM-DD` |
+| `address` | object \| null | `{line1, line2, suburb, state, postcode, country}` |
 | `role` | enum | `customer` \| `staff` \| `admin` |
 | `email_verified` | bool | |
 | `is_active` | bool | admins can deactivate |
@@ -331,8 +333,9 @@ Single document `_id: "global"`. Values not stored fall back to `.env` defaults.
 | Field | Type | Default |
 |---|---|---|
 | `restaurant_name` | string | `RoboKitchen` |
-| `currency` | string | `CURRENCY` (`usd`) |
-| `tax_rate` | float | `TAX_RATE` (0.08) |
+| `currency` | string | `CURRENCY` (`aud`) |
+| `tax_rate` | float | `TAX_RATE` (0.10 = 10% GST) |
+| `tax_label` | string | `TAX_LABEL` (`GST`) — label shown on receipts |
 | `service_fee_cents` | int | `SERVICE_FEE_CENTS` |
 | `is_accepting_orders` | bool | true — set false to pause checkout |
 | `avg_prep_minutes` | int | 4 |

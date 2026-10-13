@@ -75,7 +75,7 @@ async def send_order_confirmation(order: dict) -> None:
     await send_email(email, f"Order #{order['order_number']} received", "order_confirmation.html", {
         "name": order["customer"].get("name") or "there",
         "order": order,
-        "currency": order.get("currency", "usd").upper(),
+        "currency": order.get("currency", settings.CURRENCY).upper(),
         "track_link": f"{settings.FRONTEND_URL}/orders/{order['_id']}",
     })
 

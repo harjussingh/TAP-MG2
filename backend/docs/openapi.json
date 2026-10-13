@@ -529,6 +529,77 @@
         ]
       }
     },
+    "/api/v1/tables/numbers": {
+      "get": {
+        "tags": [
+          "QR tables"
+        ],
+        "summary": "List Table Numbers",
+        "description": "Table numbers a customer may type in (used to populate the picker on the single-QR flow).",
+        "operationId": "list_table_numbers_api_v1_tables_numbers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array",
+                  "title": "Response List Table Numbers Api V1 Tables Numbers Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tables/by-number/{number}": {
+      "get": {
+        "tags": [
+          "QR tables"
+        ],
+        "summary": "Table By Number",
+        "description": "Single-QR flow: the customer types their table number and we return the same context as a scan.",
+        "operationId": "table_by_number_api_v1_tables_by_number__number__get",
+        "parameters": [
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 9999,
+              "minimum": 1,
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableScanOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tables/scan/{code}": {
       "get": {
         "tags": [
@@ -4864,6 +4935,32 @@
         }
       }
     },
+    "/api/v1/admin/tables/venue-qr.png": {
+      "get": {
+        "tags": [
+          "Admin panel"
+        ],
+        "summary": "Venue Qr",
+        "description": "One QR for the whole venue (customer types their table number after scanning).",
+        "operationId": "venue_qr_api_v1_admin_tables_venue_qr_png_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "image/png": {}
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/tables/{table_id}/qr.png": {
       "get": {
         "tags": [
@@ -5112,6 +5209,84 @@
   },
   "components": {
     "schemas": {
+      "Address": {
+        "properties": {
+          "line1": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line1"
+          },
+          "line2": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line2"
+          },
+          "suburb": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suburb"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "postcode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 12
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postcode"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          }
+        },
+        "type": "object",
+        "title": "Address"
+      },
       "AdminUserCreate": {
         "properties": {
           "email": {
@@ -5222,6 +5397,11 @@
             "type": "number",
             "title": "Tax Rate"
           },
+          "tax_label": {
+            "type": "string",
+            "title": "Tax Label",
+            "default": "GST"
+          },
           "service_fee_cents": {
             "type": "integer",
             "title": "Service Fee Cents"
@@ -5288,6 +5468,20 @@
             ],
             "title": "Restaurant Name"
           },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency",
+            "description": "ISO code, e.g. aud"
+          },
           "tax_rate": {
             "anyOf": [
               {
@@ -5300,6 +5494,19 @@
               }
             ],
             "title": "Tax Rate"
+          },
+          "tax_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Label",
+            "description": "Shown on receipts, e.g. GST"
           },
           "service_fee_cents": {
             "anyOf": [
@@ -5448,6 +5655,20 @@
             ],
             "title": "Table Code",
             "description": "Code from the scanned QR. null = no table"
+          },
+          "table_number": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9999.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Table Number",
+            "description": "Single-QR flow: table number typed by the customer"
           },
           "order_type": {
             "$ref": "#/components/schemas/OrderType",
@@ -8467,6 +8688,17 @@
               }
             ],
             "title": "Name"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
           }
         },
         "type": "object",
@@ -8771,6 +9003,28 @@
             "title": "Loyalty Tier",
             "default": "bronze"
           },
+          "date_of_birth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Birth"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -8834,6 +9088,29 @@
               }
             ],
             "title": "Phone"
+          },
+          "date_of_birth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Of Birth",
+            "description": "YYYY-MM-DD"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "dietary_preferences": {
             "anyOf": [

@@ -18,6 +18,9 @@ async def _hit(key: str, limit: int, window: int) -> bool:
             await r.expire(k, window)
         return count <= limit
     now = time.monotonic()
+    if len(_memory) > 10_000:  # drop idle keys so memory doesn't grow with every distinct client IP
+        for k in [k for k, ts in _memory.items() if not ts or now - ts[-1] >= 3600]:  # 3600 = longest window used
+            del _memory[k]
     bucket = [t for t in _memory.get(key, []) if now - t < window]
     bucket.append(now)
     _memory[key] = bucket

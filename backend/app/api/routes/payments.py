@@ -33,6 +33,8 @@ async def mock_confirm(order=Depends(get_order_for_viewer), db=Depends(get_db)):
 @router.post("/stripe/webhook", include_in_schema=True)
 async def stripe_webhook(request: Request, db=Depends(get_db)):
     """Configure this URL in the Stripe dashboard (events: payment_intent.succeeded, payment_intent.payment_failed)."""
+    if settings.PAYMENT_PROVIDER != "stripe":
+        raise HTTPException(404, "Not found")
     event = parse_stripe_event(await request.body(), request.headers.get("stripe-signature"))
     intent = event["data"]["object"]
     order = await db.orders.find_one({"payment.provider_ref": intent["id"]})

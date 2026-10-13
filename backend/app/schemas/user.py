@@ -1,9 +1,18 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
 from app.models.enums import UserRole
+
+
+class Address(BaseModel):
+    line1: Optional[str] = Field(None, max_length=120)
+    line2: Optional[str] = Field(None, max_length=120)
+    suburb: Optional[str] = Field(None, max_length=80)
+    state: Optional[str] = Field(None, max_length=40)
+    postcode: Optional[str] = Field(None, max_length=12)
+    country: Optional[str] = Field(None, max_length=60)
 
 
 class UserOut(BaseModel):
@@ -20,6 +29,8 @@ class UserOut(BaseModel):
     loyalty_points: int = 0
     lifetime_points: int = 0
     loyalty_tier: str = "bronze"
+    date_of_birth: Optional[date] = None
+    address: Optional[Address] = None
     created_at: datetime
     last_login_at: Optional[datetime] = None
 
@@ -27,6 +38,8 @@ class UserOut(BaseModel):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=1, max_length=100)
     phone: Optional[str] = Field(None, max_length=30)
+    date_of_birth: Optional[date] = Field(None, description="YYYY-MM-DD")
+    address: Optional[Address] = None
     dietary_preferences: Optional[list[str]] = None
     allergens: Optional[list[str]] = None
     marketing_opt_in: Optional[bool] = None

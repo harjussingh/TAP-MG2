@@ -34,6 +34,7 @@ class TableRef(BaseModel):
     id: str
     number: int
     name: Optional[str] = None
+    code: Optional[str] = None
 
 
 class TableScanOut(BaseModel):

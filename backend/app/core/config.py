@@ -57,14 +57,15 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_PUBLISHABLE_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
-    CURRENCY: str = "usd"
+    CURRENCY: str = "aud"
 
     # --- Robot kitchen integration ---
     KITCHEN_API_KEY: str = "dev-kitchen-key-change-me"
     KITCHEN_WEBHOOK_URL: Optional[str] = None  # optional push notification to the robot controller
 
     # --- Default business settings (admins can change these at runtime via /admin/settings) ---
-    TAX_RATE: float = 0.08
+    TAX_RATE: float = 0.10
+    TAX_LABEL: str = "GST"
     SERVICE_FEE_CENTS: int = 0
     POINTS_PER_DOLLAR: int = 10
     POINT_VALUE_CENTS: int = 1  # 100 points = $1.00

@@ -22,7 +22,7 @@ from app.schemas.table import TableIn, TableOut, TableUpdate
 from app.schemas.user import AdminUserCreate, AdminUserUpdate, UserOut
 from app.services import loyalty_service, order_service
 from app.services.audit_service import audit
-from app.services.qr_service import qr_png, table_scan_url
+from app.services.qr_service import qr_png, table_scan_url, venue_url
 from app.services.settings_service import get_app_settings, update_app_settings
 from app.utils.helpers import doc_out, page_response, utcnow
 
@@ -278,6 +278,13 @@ async def regenerate_code(table_id: str, admin=Depends(require_admin), db=Depend
         raise HTTPException(404, "Table not found")
     await audit(db, admin, "table.regenerate_code", "table", table_id)
     return _table_out(t)
+
+
+@router.get("/tables/venue-qr.png", responses={200: {"content": {"image/png": {}}}})
+async def venue_qr(admin=Depends(require_admin)):
+    """One QR for the whole venue (customer types their table number after scanning)."""
+    return Response(qr_png(venue_url()), media_type="image/png",
+                    headers={"Content-Disposition": "inline; filename=venue-qr.png"})
 
 
 @router.get("/tables/{table_id}/qr.png", responses={200: {"content": {"image/png": {}}}})

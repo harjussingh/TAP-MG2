@@ -92,11 +92,36 @@ tests/                     end-to-end tests (run against an in-memory MongoDB)
 docs/                      API.md, DATABASE.md, FRONTEND_INTEGRATION.md, openapi.json
 ```
 
+## 4b. Staff & manager panel
+
+With the server running, open **http://localhost:8000/panel/** — the panel is a **Flutter web app** in
+`flutter_panel/`, served by this backend from `flutter_panel/build/web` (same origin, so there is no CORS setup).
+If that build folder is missing the backend falls back to the older plain HTML panel in `frontend/`.
+
+```bash
+cd flutter_panel
+flutter pub get
+flutter run -d chrome --web-port 5173          # develop: hot reload, talks to http://localhost:8000
+flutter test                                    # widget tests against a fake backend
+flutter build web --release --base-href /panel/ --no-web-resources-cdn   # rebuild what /panel/ serves
+```
+
+Point a separately hosted panel at another backend with `--dart-define=API_BASE=https://api.example.com`
+(and add that panel's origin to `ALLOWED_ORIGINS`).
+
+* **Kitchen staff**: live order board with ticket timers, robot queue with retry, sold-out switches.
+* **Manager**: takings for the day, orders with refunds and CSV export, menu availability, tables with printable
+  QR codes (per table and one for the whole venue), review moderation, team accounts, and service settings
+  (name, currency, GST rate and label, service fee, loyalty rules, pause ordering).
+
+Sign in with the demo accounts below. The board updates over the `/ws/staff` WebSocket and falls back to polling.
+
 ## 5. Documentation
 
 * **[docs/API.md](docs/API.md)**: every endpoint, who can call it, request/response examples, errors, WebSockets.
 * **[docs/DATABASE.md](docs/DATABASE.md)**: all 16 MongoDB collections with fields, indexes and relationships.
 * **[docs/FRONTEND_INTEGRATION.md](docs/FRONTEND_INTEGRATION.md)**: how each prototype screen connects to the API, with ready-to-use JavaScript.
+* **[docs/ISSUES.md](docs/ISSUES.md)**: answers to the open frontend/backend questions (QR vs table number, saved cards, RBAC wording, AUD/GST).
 * **docs/openapi.json**: import into Postman/Insomnia, or generate a typed client (`npx openapi-typescript docs/openapi.json -o api.d.ts`). Regenerate with `make openapi`.
 
 ## 6. Tests

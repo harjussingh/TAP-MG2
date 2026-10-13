@@ -108,6 +108,17 @@ if (code) {
 // await api("/cart/context", { method: "PUT", body: { order_type: "takeaway" } });
 ```
 
+**Single-QR venues** print one code pointing at `FRONTEND_URL/?enter_table=1` and ask the customer for their
+table number instead:
+
+```javascript
+const numbers = await api("/tables/numbers");            // [1,2,3,…] — show a picker, not a text box
+const { table } = await api(`/tables/by-number/${chosen}`);   // 404 if that table isn't in service
+await api("/cart/context", { method: "PUT", body: { table_number: chosen, order_type: "dine_in" } });
+```
+
+Both flows can run side by side; `PUT /cart/context` takes either `table_code` or `table_number`.
+
 ### 3.2 Menu / home
 | UI | Call |
 |---|---|
@@ -160,7 +171,7 @@ await api("/cart/merge", { method: "POST" }); // IMPORTANT: moves the guest cart
 | Forgot password | `POST /auth/forgot-password {email}` (always 200) |
 | Reset page (`/reset-password?token=`) | `POST /auth/reset-password {token, new_password}` |
 | Logout | `POST /auth/logout {refresh_token}` then `store.clear()` |
-| Profile | `GET/PATCH /users/me`, `POST /users/me/change-password`, `DELETE /users/me` |
+| Profile (incl. `date_of_birth`, `address`) | `GET/PATCH /users/me`, `POST /users/me/change-password`, `DELETE /users/me` |
 
 Password rule: 8–72 chars with at least one letter and one number.
 
@@ -169,7 +180,7 @@ Password rule: 8–72 chars with at least one letter and one number.
 const { order, order_access_token, payment } = await api("/orders/checkout", {
   method: "POST",
   body: {
-    payment_method: "card",           // "card" | "cash" | "pay_at_counter"
+    payment_method: "card",           // read the live list from GET /payments/config
     tip_cents: 100,
     redeem_points: 0,                 // logged-in users only
     customer_name: "Sam",             // required for guests

@@ -64,7 +64,7 @@ POST /auth/login
 | Method | Path | Access | Description |
 |---|---|---|---|
 | GET | `/users/me` | User | Profile. |
-| PATCH | `/users/me` | User | `full_name`, `phone`, `dietary_preferences[]`, `allergens[]`, `marketing_opt_in`. |
+| PATCH | `/users/me` | User | `full_name`, `phone`, `date_of_birth` (`YYYY-MM-DD`), `address` (`{line1, line2, suburb, state, postcode, country}`), `dietary_preferences[]`, `allergens[]`, `marketing_opt_in`. |
 | POST | `/users/me/change-password` | User | `{current_password, new_password}`. |
 | DELETE | `/users/me` | User | Deletes and anonymises the account (orders are kept for accounting). |
 
@@ -72,9 +72,16 @@ POST /auth/login
 
 | Method | Path | Access | Description |
 |---|---|---|---|
-| GET | `/tables/scan/{code}` | Public | Called when the QR is scanned. Returns `{table:{id,number,name}, restaurant_name, is_accepting_orders, currency}`. |
+| GET | `/tables/scan/{code}` | Public | Per-table QR was scanned. Returns `{table:{id,number,name,code}, restaurant_name, is_accepting_orders, currency}`. |
+| GET | `/tables/by-number/{number}` | Public | **Single-QR flow**: the customer typed their table number. Same response as a scan; 404 if the number isn't in service. |
+| GET | `/tables/numbers` | Public | `[1,2,3,…]` — active table numbers, to populate the number picker. |
 
-The printed QR points to `FRONTEND_URL/?table=CODE`. The frontend reads `table` from the URL, calls this endpoint, then `PUT /cart/context`.
+Both dine-in flows are supported and can run side by side:
+
+* **A QR per table** — the printed code points at `FRONTEND_URL/?table=CODE`. The app reads `table` from the URL and calls `/tables/scan/{code}`.
+* **One QR for the venue** — the code points at `FRONTEND_URL/?enter_table=1` (print it from `GET /admin/tables/venue-qr.png`). The app asks for the table number, calls `/tables/by-number/{number}`, then `PUT /cart/context {"table_number": 8}`.
+
+`PUT /cart/context` accepts either `table_code` or `table_number`.
 
 ## 4. Menu: `/menu` (public)
 
@@ -257,7 +264,7 @@ Job flow: `queued → assigned → cooking → done`, with `failed` (retry → `
 | Categories | `GET/POST /admin/categories`, `PATCH/DELETE /admin/categories/{id}` |
 | Ingredients | `POST /admin/ingredients`, `PATCH/DELETE /admin/ingredients/{id}` (delete also removes it from every item) |
 | Menu items | `GET/POST /admin/menu-items`, `PATCH/DELETE /admin/menu-items/{id}` (full `option_groups` editing) |
-| Tables & QR | `GET/POST /admin/tables`, `PATCH/DELETE /admin/tables/{id}`, `POST /admin/tables/{id}/regenerate-code`, `GET /admin/tables/{id}/qr.png` (printable PNG) |
+| Tables & QR | `GET/POST /admin/tables`, `PATCH/DELETE /admin/tables/{id}`, `POST /admin/tables/{id}/regenerate-code`, `GET /admin/tables/{id}/qr.png` (printable PNG), `GET /admin/tables/venue-qr.png` (one QR for the whole venue) |
 | Users | `GET /admin/users?role=&search=`, `POST /admin/users` (create staff/admin), `GET/PATCH /admin/users/{id}` (role, active), `POST /admin/users/{id}/loyalty-adjust` |
 | Orders | `GET /admin/orders?status=&payment_status=&order_number=&user_id=&date_from=&date_to=`, `POST /admin/orders/{id}/refund` |
 | Reviews | `GET /admin/reviews?max_rating=&visible=`, `PATCH /admin/reviews/{id}` (`is_visible`, `staff_reply`) |
@@ -285,5 +292,11 @@ POST /admin/menu-items
 Message format: `{ "event": "order.updated", "data": { …same shape as the REST object… } }`.
 Send the text `ping` every ~25 s to keep the connection alive (server answers `pong`). Invalid auth closes the socket with code `4403`. After a reconnect, re-fetch over REST to catch up.
 
-## 15. Health
+## 15. Staff & manager panel (served by this backend)
+
+`GET /panel/` serves a ready-made web panel built on these endpoints: order board, robot queue, sold-out
+switches, takings, orders and refunds, menu, tables and QR codes, reviews, team and settings. It is plain
+HTML/JS in `frontend/index.html`, same-origin, so no CORS setup is needed.
+
+## 16. Health
 `GET /health` → `{status, database, redis, version, environment}` (HTTP 503 if the database is down). `GET /` → name, version and docs URL.
