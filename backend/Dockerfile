@@ -10,7 +10,6 @@ RUN pip install -r requirements.txt
 
 COPY app ./app
 COPY scripts ./scripts
-COPY frontend ./frontend
 
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
