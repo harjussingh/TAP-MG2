@@ -75,10 +75,11 @@ async def clear_cart(ctx: CartCtx = Depends(cart_ctx)):
 @router.put("/context", response_model=CartOut)
 async def set_context(data: CartContextIn, ctx: CartCtx = Depends(cart_ctx)):
     """Attach the scanned table (dine-in) or switch to takeaway."""
-    if data.table_code:
-        table = await ctx.db.tables.find_one({"code": data.table_code, "is_active": True})
+    if data.table_code or data.table_number is not None:
+        query = {"code": data.table_code} if data.table_code else {"number": data.table_number}
+        table = await ctx.db.tables.find_one({**query, "is_active": True})
         if not table:
-            raise HTTPException(404, "Table not found")
+            raise HTTPException(404, "Table not found. Please check the number on your table.")
         ctx.cart["table"] = {"id": table["_id"], "number": table["number"], "name": table.get("name")}
     else:
         ctx.cart["table"] = None

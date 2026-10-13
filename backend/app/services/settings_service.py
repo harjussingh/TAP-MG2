@@ -8,6 +8,7 @@ def _defaults() -> dict:
         "restaurant_name": "RoboKitchen",
         "currency": settings.CURRENCY,
         "tax_rate": settings.TAX_RATE,
+        "tax_label": settings.TAX_LABEL,
         "service_fee_cents": settings.SERVICE_FEE_CENTS,
         "is_accepting_orders": True,
         "avg_prep_minutes": 4,

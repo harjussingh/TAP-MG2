@@ -58,7 +58,8 @@ async def list_items(
     if featured is not None:
         query["is_featured"] = featured
     total = await db.menu_items.count_documents(query)
-    docs = await db.menu_items.find(query).sort([("sort_order", 1), ("name", 1)]).skip((page - 1) * size).limit(size).to_list(size)
+    cursor = db.menu_items.find(query).sort([("sort_order", 1), ("name", 1)])
+    docs = await cursor.skip((page - 1) * size).limit(size).to_list(size)
     return page_response(await expand_items(db, docs), total, page, size)
 
 

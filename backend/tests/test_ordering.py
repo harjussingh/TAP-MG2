@@ -36,7 +36,7 @@ def test_guest_dine_in_cash_order_full_lifecycle(client, bowl, staff_h, admin_h)
     assert cart["item_count"] == 2 and cart["table"]["number"] == 1
     subtotal = 2 * (1095 + 250 + 150)
     assert cart["totals"]["subtotal_cents"] == subtotal
-    assert cart["totals"]["tax_cents"] == round(subtotal * 0.08)
+    assert cart["totals"]["tax_cents"] == round(subtotal * 0.10)
 
     # guest must give a name
     assert client.post(f"{API}/orders/checkout", json={"payment_method": "cash"}, headers=GUEST).status_code == 422
@@ -165,9 +165,48 @@ def test_admin_menu_crud_and_settings(client, admin_h):
 
     s = client.patch(f"{API}/admin/settings", json={"tax_rate": 0.1}, headers=admin_h)
     assert s.json()["tax_rate"] == 0.1
-    client.patch(f"{API}/admin/settings", json={"tax_rate": 0.08}, headers=admin_h)
+    client.patch(f"{API}/admin/settings", json={"tax_rate": 0.10}, headers=admin_h)
 
     staff = client.post(f"{API}/admin/users", json={"email": "cook@robokitchen.com", "password": "Cook12345",
                                                     "full_name": "Cook", "role": "staff"}, headers=admin_h)
     assert staff.status_code == 201 and staff.json()["role"] == "staff"
     assert client.get(f"{API}/admin/audit-logs", headers=admin_h).json()["total"] > 0
+
+
+def test_single_qr_table_number_flow(client):
+    """Client's single-QR journey: customer types the table number instead of scanning a per-table code."""
+    numbers = client.get(f"{API}/tables/numbers").json()
+    assert numbers[:3] == [1, 2, 3]
+
+    ctx = client.get(f"{API}/tables/by-number/3")
+    assert ctx.status_code == 200
+    body = ctx.json()
+    assert body["table"]["number"] == 3 and body["table"]["code"]
+
+    assert client.get(f"{API}/tables/by-number/999").status_code == 404
+
+    h = {"X-Session-Id": "sess-table-number-flow"}
+    cart = client.put(f"{API}/cart/context", json={"table_number": 3, "order_type": "dine_in"}, headers=h)
+    assert cart.status_code == 200
+    assert cart.json()["table"]["number"] == 3
+
+    # the per-table QR route still works, so both approaches are supported
+    scan = client.get(f"{API}/tables/scan/{body['table']['code']}")
+    assert scan.json()["table"]["number"] == 3
+
+
+def test_profile_accepts_dob_and_address(client, customer_h):
+    r = client.patch(f"{API}/users/me", headers=customer_h, json={
+        "date_of_birth": "1995-04-17",
+        "address": {"line1": "12 Flinders Lane", "suburb": "Melbourne", "state": "VIC",
+                    "postcode": "3000", "country": "Australia"}})
+    assert r.status_code == 200, r.text
+    me = client.get(f"{API}/users/me", headers=customer_h).json()
+    assert me["date_of_birth"] == "1995-04-17"
+    assert me["address"]["suburb"] == "Melbourne"
+
+
+def test_venue_qr_and_gst_defaults(client, admin_h):
+    assert client.get(f"{API}/admin/tables/venue-qr.png", headers=admin_h).headers["content-type"] == "image/png"
+    cfg = client.get(f"{API}/admin/settings", headers=admin_h).json()
+    assert cfg["currency"] == "aud" and cfg["tax_rate"] == 0.10 and cfg["tax_label"] == "GST"

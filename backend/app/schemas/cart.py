@@ -22,6 +22,8 @@ class CartItemUpdate(BaseModel):
 
 class CartContextIn(BaseModel):
     table_code: Optional[str] = Field(None, description="Code from the scanned QR. null = no table")
+    table_number: Optional[int] = Field(None, ge=1, le=9999,
+                                        description="Single-QR flow: table number typed by the customer")
     order_type: OrderType = OrderType.dine_in
 
 

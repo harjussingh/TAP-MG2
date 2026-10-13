@@ -9,6 +9,11 @@ def table_scan_url(code: str) -> str:
     return f"{settings.FRONTEND_URL}/?table={code}"
 
 
+def venue_url() -> str:
+    """Single-QR flow: one printed code for the whole venue; the customer types their table number."""
+    return f"{settings.FRONTEND_URL}/?enter_table=1"
+
+
 def qr_png(data: str) -> bytes:
     img = qrcode.make(data, box_size=10, border=2)
     buf = io.BytesIO()

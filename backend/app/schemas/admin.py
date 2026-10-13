@@ -7,6 +7,7 @@ class AppSettingsOut(BaseModel):
     restaurant_name: str
     currency: str
     tax_rate: float
+    tax_label: str = "GST"
     service_fee_cents: int
     is_accepting_orders: bool
     avg_prep_minutes: int
@@ -19,7 +20,9 @@ class AppSettingsOut(BaseModel):
 
 class AppSettingsUpdate(BaseModel):
     restaurant_name: Optional[str] = Field(None, max_length=80)
+    currency: Optional[str] = Field(None, min_length=3, max_length=3, description="ISO code, e.g. aud")
     tax_rate: Optional[float] = Field(None, ge=0, le=0.5)
+    tax_label: Optional[str] = Field(None, max_length=20, description="Shown on receipts, e.g. GST")
     service_fee_cents: Optional[int] = Field(None, ge=0)
     is_accepting_orders: Optional[bool] = None
     avg_prep_minutes: Optional[int] = Field(None, ge=1, le=120)

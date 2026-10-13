@@ -18,7 +18,7 @@ async def get_profile(user=Depends(get_current_user)):
 
 @router.patch("/me", response_model=UserOut)
 async def update_profile(data: UserUpdate, user=Depends(get_current_user), db=Depends(get_db)):
-    changes = data.model_dump(exclude_unset=True)
+    changes = data.model_dump(exclude_unset=True, mode="json")  # mode="json": date -> "YYYY-MM-DD" for Mongo
     if changes:
         changes["updated_at"] = utcnow()
         await db.users.update_one({"_id": user["_id"]}, {"$set": changes})
