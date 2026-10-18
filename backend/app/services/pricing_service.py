@@ -90,22 +90,36 @@ def _round(value: Decimal) -> int:
     return int(value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
-def compute_totals(subtotal: int, cfg: dict, *, redeem_points: int = 0, available_points: int = 0,
+
+def compute_totals(subtotal: int, cfg: dict, *,
+                   redeem_points: int = 0, available_points: int = 0,
                    tip_cents: int = 0) -> dict:
     discount = 0
     points_used = 0
+
     if redeem_points:
         if redeem_points < cfg["min_points_to_redeem"]:
             raise HTTPException(422, f"Minimum {cfg['min_points_to_redeem']} points to redeem")
+
         if redeem_points > available_points:
             raise HTTPException(422, "Not enough loyalty points")
+
         max_discount = subtotal * cfg["max_redeem_percent"] // 100
         points_used = min(redeem_points, max_discount // cfg["point_value_cents"])
         discount = points_used * cfg["point_value_cents"]
+
+   
+
     taxable = subtotal - discount
     tax_rate = float(cfg["tax_rate"])
-    tax = _round(Decimal(taxable) * Decimal(str(tax_rate)))
     fee = cfg["service_fee_cents"] if subtotal > 0 else 0
+
+    # GST is included in menu prices and service fees
+    rate = Decimal(str(tax_rate))
+    tax = _round(
+        Decimal(taxable + fee) * rate / (Decimal("1") + rate)
+    )
+
     return {
         "subtotal_cents": subtotal,
         "discount_cents": discount,
@@ -114,5 +128,7 @@ def compute_totals(subtotal: int, cfg: dict, *, redeem_points: int = 0, availabl
         "tax_cents": tax,
         "service_fee_cents": fee,
         "tip_cents": tip_cents,
-        "total_cents": taxable + tax + fee + tip_cents,
+        "total_cents": taxable + fee + tip_cents,
     }
+
+
