@@ -36,7 +36,8 @@ def test_guest_dine_in_cash_order_full_lifecycle(client, bowl, staff_h, admin_h)
     assert cart["item_count"] == 2 and cart["table"]["number"] == 1
     subtotal = 2 * (1095 + 250 + 150)
     assert cart["totals"]["subtotal_cents"] == subtotal
-    assert cart["totals"]["tax_cents"] == round(subtotal * 0.10)
+    assert cart["totals"]["tax_cents"] == round(subtotal / 11)
+    assert cart["totals"]["total_cents"] == subtotal
 
     # guest must give a name
     assert client.post(f"{API}/orders/checkout", json={"payment_method": "cash"}, headers=GUEST).status_code == 422
@@ -210,3 +211,28 @@ def test_venue_qr_and_gst_defaults(client, admin_h):
     assert client.get(f"{API}/admin/tables/venue-qr.png", headers=admin_h).headers["content-type"] == "image/png"
     cfg = client.get(f"{API}/admin/settings", headers=admin_h).json()
     assert cfg["currency"] == "aud" and cfg["tax_rate"] == 0.10 and cfg["tax_label"] == "GST"
+
+    
+def test_gst_inclusive_with_service_fee_and_tip():
+    from app.services.pricing_service import compute_totals
+
+    cfg = {
+        "tax_rate": 0.10,
+        "service_fee_cents": 110,
+        "min_points_to_redeem": 100,
+        "max_redeem_percent": 50,
+        "point_value_cents": 1,
+    }
+
+    result = compute_totals(
+        subtotal=1890,
+        cfg=cfg,
+        tip_cents=200
+    )
+
+    assert result["subtotal_cents"] == 1890
+    assert result["service_fee_cents"] == 110
+    assert result["tip_cents"] == 200
+    assert result["tax_cents"] == 182
+    assert result["total_cents"] == 2200
+
