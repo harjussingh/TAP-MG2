@@ -234,7 +234,7 @@ class _Stepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
-    final stages = OrderStage.values;
+    const stages = OrderStage.values;
     final currentIndex = stages.indexOf(stage);
 
     return Container(

@@ -12,6 +12,22 @@ import 'app_settings.dart';
 class AppTypography {
   const AppTypography._();
 
+  /// Colour-emoji fallback families, applied app-wide through [AppTheme].
+  ///
+  /// Text is drawn in Inter (via google_fonts), which has no emoji glyphs.
+  /// On the emulator the engine quietly falls back to the system emoji font,
+  /// but some Android OEM builds don't, so emoji render as blank circles.
+  /// Naming the system colour-emoji font here forces the fallback on every
+  /// device. The names cover Android, iOS and the desktop hosts; unknown
+  /// names are simply skipped.
+  static const List<String> emojiFallback = <String>[
+    'Noto Color Emoji',
+    'NotoColorEmoji',
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Noto Emoji',
+  ];
+
   static double _s(double size) => size * settings.textScale.factor;
 
   static TextStyle get screenTitle => GoogleFonts.inter(

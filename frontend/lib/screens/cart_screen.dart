@@ -7,9 +7,15 @@ import '../theme/app_settings.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../widgets/dish_card.dart';
+import '../widgets/quantity_stepper.dart';
 import '../widgets/state_views.dart';
 import 'checkout_screen.dart';
 
+/// The order before it is sent.
+///
+/// Identical bowls are grouped into one row with a quantity, which is how
+/// people think about an order: "two tuna bowls", not "a tuna bowl and another
+/// tuna bowl".
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
@@ -37,14 +43,55 @@ class _CartScreenState extends State<CartScreen> {
     super.dispose();
   }
 
+  /// Groups the flat cart into rows of identical lines.
+  List<_Group> _groups(AppState state) {
+    final groups = <String, _Group>{};
+    for (final line in state.cart) {
+      final key = '${line.title}|${line.subtitle}';
+      groups.putIfAbsent(key, () => _Group(line: line, count: 0)).count++;
+    }
+    return groups.values.toList();
+  }
+
+  void _setQuantity(AppState state, _Group group, int next) {
+    setState(() {
+      if (next > group.count) {
+        state.addToCart(group.line);
+        return;
+      }
+      for (var i = state.cart.length - 1; i >= 0; i--) {
+        final line = state.cart[i];
+        if (line.title == group.line.title &&
+            line.subtitle == group.line.subtitle) {
+          state.removeFromCart(i);
+          return;
+        }
+      }
+    });
+  }
+
+  void _removeAll(AppState state, _Group group) {
+    setState(() {
+      for (var i = state.cart.length - 1; i >= 0; i--) {
+        final line = state.cart[i];
+        if (line.title == group.line.title &&
+            line.subtitle == group.line.subtitle) {
+          state.removeFromCart(i);
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
     final state = AppScope.of(context);
-    final subtitle = state.orderType == OrderType.dineIn &&
-            state.tableNumber.isNotEmpty
-        ? '${state.orderType.label} \u00b7 Table ${state.tableNumber}'
-        : state.orderType.label;
+    final groups = _groups(state);
+
+    final subtitle =
+        state.orderType == OrderType.dineIn && state.tableNumber.isNotEmpty
+            ? '${state.orderType.label} · Table ${state.tableNumber}'
+            : state.orderType.label;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -52,17 +99,17 @@ class _CartScreenState extends State<CartScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Your cart'),
+            const Text('Your order'),
             Text(subtitle,
                 style: AppTypography.secondary
-                    .copyWith(color: AppColors.textSecondary)),
+                    .copyWith(color: AppColors.onHeader.withValues(alpha: 0.7))),
           ],
         ),
       ),
       body: state.cart.isEmpty
           ? EmptyStateView(
-              icon: Icons.shopping_cart_outlined,
-              title: 'Your cart is empty',
+              icon: Icons.shopping_bag_outlined,
+              title: 'Nothing here yet',
               message: 'Add a bowl and it will show up here.',
               actionLabel: 'Browse the menu',
               onAction: () => Navigator.pop(context),
@@ -70,64 +117,27 @@ class _CartScreenState extends State<CartScreen> {
           : ListView(
               padding: const EdgeInsets.all(AppSpacing.screenPadding),
               children: [
-                for (var i = 0; i < state.cart.length; i++)
-                  _Line(
-                    line: state.cart[i],
-                    onRemove: () => setState(() => state.removeFromCart(i)),
+                for (final group in groups)
+                  _LineCard(
+                    group: group,
+                    onQuantity: (v) => _setQuantity(state, group, v),
+                    onRemove: () => _removeAll(state, group),
                   ),
-                const SizedBox(height: AppSpacing.md),
-                if (state.orderType == OrderType.dineIn) _tableCard(state),
-                // The promo code is member only, so a guest never sees it.
-                if (state.isMember) _promoCard(),
+                const SizedBox(height: AppSpacing.sm),
+                if (state.orderType == OrderType.dineIn) _tableCard(),
+                // Loyalty points are a member benefit, so a guest never sees
+                // the field. The server enforces this too.
+                if (state.isMember) _loyaltyCard(),
                 _totalsCard(state),
                 const SizedBox(height: AppSpacing.xxxl),
               ],
             ),
-      bottomNavigationBar: state.cart.isEmpty
-          ? null
-          : SafeArea(
-              child: Container(
-                padding: const EdgeInsets.all(AppSpacing.screenPadding),
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  border: Border(top: BorderSide(color: AppColors.border)),
-                ),
-                child: Row(
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(formatPrice(state.cartTotal),
-                            style: AppTypography.cardTitle),
-                        Text(
-                            '${state.cart.length} item'
-                            '${state.cart.length == 1 ? '' : 's'}',
-                            style: AppTypography.secondary),
-                      ],
-                    ),
-                    const Spacer(),
-                    SizedBox(
-                      width: 190,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          state.setTableNumber(_table.text);
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                                builder: (_) => const CheckoutScreen()),
-                          );
-                        },
-                        child: const Text('Checkout \u2192'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+      bottomNavigationBar:
+          state.cart.isEmpty ? null : _checkoutBar(context, state),
     );
   }
 
-  Widget _tableCard(AppState state) => _Card(
+  Widget _tableCard() => _Panel(
         label: 'TABLE NUMBER',
         child: TextField(
           controller: _table,
@@ -137,104 +147,205 @@ class _CartScreenState extends State<CartScreen> {
         ),
       );
 
-  Widget _promoCard() => _Card(
-        label: 'PROMO CODE',
+  /// The API has no coupons: members earn and redeem loyalty points instead.
+  /// See INTEGRATION_CHECK.md 3.7.
+  Widget _loyaltyCard() => _Panel(
         child: Row(
           children: [
+            Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.stars_rounded, color: AppColors.primary),
+            ),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
-              child: TextField(
-                style: AppTypography.body,
-                decoration:
-                    const InputDecoration(hintText: 'e.g. WELCOME10'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Loyalty points',
+                      style: AppTypography.body
+                          .copyWith(fontWeight: FontWeight.w600)),
+                  Text('Redeem at checkout, from 100 points',
+                      style: AppTypography.secondary),
+                ],
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
-            SizedBox(
-              width: 96,
-              height: AppSpacing.inputHeight,
-              child: ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md),
-                ),
-                child: const Text('Apply'),
-              ),
-            ),
+            Icon(Icons.chevron_right, color: AppColors.textSecondary),
           ],
         ),
       );
 
   Widget _totalsCard(AppState state) {
     final gst = state.cartTotal / 11;
-    return _Card(
+    return _Panel(
       child: Column(
         children: [
           _Row(label: 'Subtotal', value: formatPrice(state.cartTotal)),
-          const Divider(height: AppSpacing.xl),
-          _Row(label: 'Total', value: formatPrice(state.cartTotal), bold: true),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.sm),
+          _Row(label: 'Includes GST', value: formatPrice(gst), muted: true),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: Divider(height: 1, color: AppColors.border),
+          ),
           _Row(
-              label: 'Includes GST',
-              value: formatPrice(gst),
-              muted: true),
+              label: 'Total',
+              value: formatPrice(state.cartTotal),
+              bold: true),
         ],
+      ),
+    );
+  }
+
+  Widget _checkoutBar(BuildContext context, AppState state) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          child: Row(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(formatPrice(state.cartTotal),
+                      style: AppTypography.cardTitle
+                          .copyWith(fontWeight: FontWeight.w700)),
+                  Text(
+                      '${state.cart.length} item'
+                      '${state.cart.length == 1 ? '' : 's'}',
+                      style: AppTypography.secondary),
+                ],
+              ),
+              const SizedBox(width: AppSpacing.lg),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    state.setTableNumber(_table.text);
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                          builder: (_) => const CheckoutScreen()),
+                    );
+                  },
+                  child: const Text('Checkout'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _Line extends StatelessWidget {
-  const _Line({required this.line, required this.onRemove});
+class _Group {
+  _Group({required this.line, required this.count});
 
   final CartLine line;
+  int count;
+
+  double get total => line.price * count;
+  int get kilojoules => line.kilojoules * count;
+}
+
+class _LineCard extends StatelessWidget {
+  const _LineCard({
+    required this.group,
+    required this.onQuantity,
+    required this.onRemove,
+  });
+
+  final _Group group;
+  final ValueChanged<int> onQuantity;
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
-    SettingsScope.watch(context);
+    final line = group.line;
+
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.cardGap),
-      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+        border: Border.all(color: AppColors.border),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          EmojiTile(emoji: line.emoji, colour: AppColors.tileBlue, size: 56),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(line.title, style: AppTypography.cardTitle),
-                const SizedBox(height: AppSpacing.xs),
-                Text(line.subtitle,
-                    style: AppTypography.secondary,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
-                const SizedBox(height: AppSpacing.sm),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              EmojiTile(
+                  emoji: line.emoji, colour: AppColors.tileBlue, size: 56),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(formatPrice(line.price),
-                        style: AppTypography.cardTitle
-                            .copyWith(fontWeight: FontWeight.w700)),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(formatKilojoules(line.kilojoules),
-                        style: AppTypography.secondary),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(line.title,
+                              style: AppTypography.body
+                                  .copyWith(fontWeight: FontWeight.w700)),
+                        ),
+                        if (line.isCustom)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.sm, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.tileBlue,
+                              borderRadius: BorderRadius.circular(
+                                  AppSpacing.radiusPill),
+                            ),
+                            child: Text('Custom',
+                                style:
+                                    AppTypography.label.copyWith(fontSize: 11)),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(line.subtitle,
+                        style: AppTypography.secondary,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(formatKilojoules(group.kilojoules),
+                        style: AppTypography.label
+                            .copyWith(color: AppColors.textSecondary)),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          IconButton(
-            onPressed: onRemove,
-            icon: const Icon(Icons.close, color: AppColors.error),
-            tooltip: 'Remove',
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              QuantityStepper(
+                value: group.count,
+                compact: true,
+                onChanged: onQuantity,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              IconButton(
+                onPressed: onRemove,
+                icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                tooltip: 'Remove ${line.title}',
+              ),
+              const Spacer(),
+              Text(formatPrice(group.total),
+                  style: AppTypography.cardTitle
+                      .copyWith(fontWeight: FontWeight.w700)),
+            ],
           ),
         ],
       ),
@@ -242,28 +353,29 @@ class _Line extends StatelessWidget {
   }
 }
 
-class _Card extends StatelessWidget {
-  const _Card({this.label, required this.child});
+class _Panel extends StatelessWidget {
+  const _Panel({this.label, required this.child});
 
   final String? label;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    SettingsScope.watch(context);
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.cardGap),
-      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (label != null) ...[
             Text(label!,
-                style: AppTypography.label.copyWith(letterSpacing: 1.2)),
+                style: AppTypography.label.copyWith(
+                    letterSpacing: 1.2, color: AppColors.textSecondary)),
             const SizedBox(height: AppSpacing.sm),
           ],
           child,
@@ -288,12 +400,11 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    SettingsScope.watch(context);
     final style = muted
         ? AppTypography.secondary
         : AppTypography.body.copyWith(
             fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
-            fontSize: bold ? 18 : 16);
+            fontSize: bold ? 19 : 16);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [Text(label, style: style), Text(value, style: style)],

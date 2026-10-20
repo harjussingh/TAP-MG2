@@ -32,6 +32,10 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.surface,
       textTheme: AppTypography.textTheme,
+      // Make colour emoji fall back to the system emoji font everywhere, so
+      // the orbit icons and ingredient emoji render on every Android device,
+      // not just the emulator. Applied to the whole text theme by ThemeData.
+      fontFamilyFallback: AppTypography.emojiFallback,
       dividerColor: AppColors.border,
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.header,

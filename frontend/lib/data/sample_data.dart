@@ -15,6 +15,11 @@ List<Dish> kDishes = [
     emoji: '\u{1F41F}',
     tileColour: AppColors.tilePink,
     tags: {DishTag.popular, DishTag.spicy},
+  
+    rating: 4.8,
+    reviewCount: 212,
+    paletteKey: 'crimson',
+    blurb: 'Our signature bowl. Sashimi-grade salmon over warm rice, with avocado and cucumber for crunch, finished with a sriracha mayo that has just enough heat to notice.',
   ),
   Dish(
     id: 'garden-zen',
@@ -26,6 +31,11 @@ List<Dish> kDishes = [
     emoji: '\u{1F966}',
     tileColour: AppColors.tileGreen,
     tags: {DishTag.vegan, DishTag.glutenFree},
+  
+    rating: 4.6,
+    reviewCount: 148,
+    paletteKey: 'moss',
+    blurb: 'Entirely plant based and not quietly so. Edamame and tofu carry the protein, pickled ginger cuts through, and the miso sesame ties it together.',
   ),
   Dish(
     id: 'tuna-poke',
@@ -36,6 +46,11 @@ List<Dish> kDishes = [
     kilojoules: 2010,
     emoji: '\u{1F34B}',
     tags: {DishTag.popular},
+  
+    rating: 4.9,
+    reviewCount: 301,
+    paletteKey: 'amber',
+    blurb: 'The one people come back for. Ahi tuna with ripe mango and spring onion, dressed in a citrus ponzu that keeps it light.',
   ),
   Dish(
     id: 'chicken-teriyaki',
@@ -46,6 +61,11 @@ List<Dish> kDishes = [
     kilojoules: 2340,
     emoji: '\u{1F357}',
     tags: {DishTag.bestseller},
+  
+    rating: 4.7,
+    reviewCount: 265,
+    paletteKey: 'ember',
+    blurb: 'Teriyaki chicken grilled to order, with edamame and sweet corn. The sweet soy glaze is made in house and reduced until it coats.',
   ),
   Dish(
     id: 'spicy-salmon',
@@ -58,6 +78,11 @@ List<Dish> kDishes = [
     tileColour: AppColors.tilePink,
     tags: {DishTag.glutenFree},
     inStock: false,
+  
+    rating: 4.5,
+    reviewCount: 97,
+    paletteKey: 'crimson',
+    blurb: 'For the chilli inclined. Salmon with fresh jalapeno and red onion in a chilli sesame dressing that builds rather than shouts.',
   ),
   Dish(
     id: 'build-your-own',
@@ -70,6 +95,11 @@ List<Dish> kDishes = [
     tileColour: AppColors.tileBlue,
     tags: {DishTag.custom},
     isCustom: true,
+  
+    rating: 4.8,
+    reviewCount: 430,
+    paletteKey: 'indigo',
+    blurb: 'Take the wheel. Pick your base, load your protein, stack your vegetables, and the machine builds it exactly to spec.',
   ),
 ];
 

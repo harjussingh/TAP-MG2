@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_state.dart';
-import 'screens/qr_screen.dart';
+import 'screens/intro_screen.dart';
 import 'theme/app_settings.dart';
 import 'theme/app_theme.dart';
 
@@ -52,7 +52,7 @@ class _RobomosAppState extends State<RobomosApp> {
             notifier: widget.settings,
             child: child ?? const SizedBox.shrink(),
           ),
-          home: const QrScreen(),
+          home: const IntroScreen(),
         ),
       ),
     );

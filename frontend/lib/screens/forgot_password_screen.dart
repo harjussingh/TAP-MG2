@@ -232,7 +232,7 @@ class AuthPane extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: AppColors.primary.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(AppSpacing.lg),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
             border: Border.all(color: AppColors.primary.withValues(alpha: 0.45)),
           ),
           child: Icon(icon, color: AppColors.primary, size: 26),

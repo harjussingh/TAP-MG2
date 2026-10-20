@@ -31,6 +31,11 @@ class AppSpacing {
 
   // Rounded, Soft or Crisp.
   static double get radiusCard => settings.uiStyle.card;
+
+  /// The big curve where a sheet rises over an illustration. Twice the card
+  /// radius, so a Crisp setting gets a crisp sheet rather than a rounded one
+  /// sitting on square content.
+  static double get radiusSheet => settings.uiStyle.card * 2;
   static double get radiusInput => settings.uiStyle.input;
   static double get radiusPill => settings.uiStyle.pill;
 }
