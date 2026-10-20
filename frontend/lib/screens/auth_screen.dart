@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
-import '../models/order.dart';
 import '../models/user_profile.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_settings.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../widgets/kitchen_scene.dart';
 import '../widgets/robomos_logo.dart';
 import 'forgot_password_screen.dart';
 import 'table_number_screen.dart';
 
 enum AuthMode { signIn, signUp }
 
-/// Sign in and sign up on one screen, with an animated toggle between them.
+/// Sign in and sign up.
 ///
-/// Dark, matching the QR and continue-as screens, so the whole entry flow
-/// feels like one piece before the app opens into its light interface.
+/// An illustrated scene fills the top of the screen and the form sits on a
+/// white sheet curving over it. The scene is the Fishbowl machine dropping
+/// ingredients into a bowl, so the first thing anyone sees is what the
+/// restaurant does, and the sheet rises to meet the extra fields when the mode
+/// changes rather than the form scrolling away under a fixed picture.
 class AuthScreen extends StatefulWidget {
   const AuthScreen({
     super.key,
@@ -39,7 +42,7 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AuthMode _mode = widget.mode;
 
   final _formKey = GlobalKey<FormState>();
@@ -51,15 +54,24 @@ class _AuthScreenState extends State<AuthScreen>
   bool _obscure = true;
   bool _busy = false;
   bool _keepSignedIn = true;
+  String? _failure;
 
   late final AnimationController _intro = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 900),
+    duration: const Duration(milliseconds: 850),
   )..forward();
+
+  /// One slow loop drives the whole scene: clouds, sun and the falling
+  /// ingredients all read from it.
+  late final AnimationController _scene = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 14),
+  )..repeat();
 
   @override
   void dispose() {
     _intro.dispose();
+    _scene.dispose();
     for (final c in [_name, _email, _password, _confirm]) {
       c.dispose();
     }
@@ -73,8 +85,28 @@ class _AuthScreenState extends State<AuthScreen>
     FocusScope.of(context).unfocus();
     setState(() {
       _mode = mode;
+      _failure = null;
       _formKey.currentState?.reset();
     });
+  }
+
+  Widget _stagger(double start, Widget child, {double rise = 18}) {
+    final curve = CurvedAnimation(
+      parent: _intro,
+      curve: Interval(start, (start + 0.55).clamp(0.0, 1.0),
+          curve: Curves.easeOutCubic),
+    );
+    return AnimatedBuilder(
+      animation: curve,
+      builder: (context, _) => Opacity(
+        opacity: curve.value,
+        child: Transform.translate(
+          offset: Offset(0, rise * (1 - curve.value)),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
   }
 
   // ------------------------------------------------------------ validation
@@ -97,8 +129,11 @@ class _AuthScreenState extends State<AuthScreen>
     final value = v ?? '';
     if (value.isEmpty) return 'Enter your password';
     if (!_isSignUp) return null;
+    // The backend rule: 8 to 72 characters with at least one letter and one
+    // number. Checking here saves a round trip to be told the same thing.
     if (value.length < 8) return 'Use at least 8 characters';
-    if (!RegExp(r'[0-9]').hasMatch(value)) return 'Include at least one number';
+    if (!RegExp(r'[0-9]').hasMatch(value)) return 'Include a number';
+    if (!RegExp(r'[A-Za-z]').hasMatch(value)) return 'Include a letter';
     return null;
   }
 
@@ -112,10 +147,13 @@ class _AuthScreenState extends State<AuthScreen>
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     FocusScope.of(context).unfocus();
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _failure = null;
+    });
 
-    // TODO(backend): RoboKitchenApi.login / register, then use the returned
-    // token. The role is read from that token on the server.
+    // TODO(api): RoboKitchenApi.login / register, then mergeGuestCart().
+    // The role is read from the returned token on the server, never sent.
     await Future<void>.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
 
@@ -149,391 +187,55 @@ class _AuthScreenState extends State<AuthScreen>
     );
   }
 
-  void _continueAsGuest() {
-    AppScope.of(context).setRole(UserRole.guest);
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const TableNumberScreen()),
-    );
-  }
-
-  /// Staggered entrance: each piece fades and rises a moment after the last.
-  Widget _stagger(double start, Widget child) {
-    final curve = CurvedAnimation(
-      parent: _intro,
-      curve: Interval(start, (start + 0.55).clamp(0.0, 1.0),
-          curve: Curves.easeOutCubic),
-    );
-    return AnimatedBuilder(
-      animation: curve,
-      builder: (context, _) => Opacity(
-        opacity: curve.value,
-        child: Transform.translate(
-          offset: Offset(0, 24 * (1 - curve.value)),
-          child: child,
-        ),
-      ),
-      child: child,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
+    final still = MediaQuery.disableAnimationsOf(context);
+
+    // Everything is measured from the space actually available, not from the
+    // screen size. When the keyboard opens the Scaffold shrinks this box, the
+    // scene shrinks with it, and the form keeps its room. Reading the screen
+    // height instead is what put the sheet in the wrong place.
     return Scaffold(
-      backgroundColor: AppColors.header,
-      body: Stack(
-        children: [
-          const _Glow(),
-          SafeArea(
-            child: Column(
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  ),
-                ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.screenPadding,
-                        0, AppSpacing.screenPadding, AppSpacing.xl),
-                    children: [
-                      _stagger(0.00, const _Brand()),
-                      const SizedBox(height: AppSpacing.xl),
-                      _stagger(0.10, _Heading(isSignUp: _isSignUp)),
-                      const SizedBox(height: AppSpacing.xl),
-                      _stagger(0.20, _card()),
-                      const SizedBox(height: AppSpacing.lg),
-                      _stagger(0.32, _guestRow()),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _card() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(AppSpacing.xl),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            _ModeToggle(mode: _mode, onChanged: _switchTo),
-            const SizedBox(height: AppSpacing.lg),
-
-            // AnimatedSize keeps the card growing and shrinking smoothly as
-            // fields appear and disappear between the two modes.
-            AnimatedSize(
-              duration: const Duration(milliseconds: 280),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.topCenter,
-              child: Column(
-                children: [
-                  if (_isSignUp)
-                    _AuthField(
-                      key: const ValueKey('name'),
-                      controller: _name,
-                      hint: 'Full name',
-                      icon: Icons.person_outline,
-                      validator: _validateName,
-                    ),
-                  _AuthField(
-                    controller: _email,
-                    hint: 'Email address',
-                    icon: Icons.mail_outline,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: _validateEmail,
-                  ),
-                  _AuthField(
-                    controller: _password,
-                    hint: 'Password',
-                    icon: Icons.lock_outline,
-                    obscure: _obscure,
-                    validator: _validatePassword,
-                    trailing: IconButton(
-                      onPressed: () => setState(() => _obscure = !_obscure),
-                      icon: Icon(
-                        _obscure
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        size: 20,
-                        color: Colors.white54,
-                      ),
-                      tooltip: _obscure ? 'Show password' : 'Hide password',
-                    ),
-                  ),
-                  if (_isSignUp)
-                    _AuthField(
-                      key: const ValueKey('confirm'),
-                      controller: _confirm,
-                      hint: 'Confirm password',
-                      icon: Icons.lock_outline,
-                      obscure: _obscure,
-                      validator: _validateConfirm,
-                    ),
-                ],
-              ),
-            ),
-
-            if (!_isSignUp)
-              Row(
-                children: [
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: Checkbox(
-                      value: _keepSignedIn,
-                      onChanged: (v) =>
-                          setState(() => _keepSignedIn = v ?? false),
-                      activeColor: AppColors.primary,
-                      checkColor: AppColors.onPrimary,
-                      side: const BorderSide(color: Colors.white38),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Text('Keep me signed in',
-                      style: AppTypography.secondary
-                          .copyWith(color: Colors.white70)),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) =>
-                            ForgotPasswordScreen(email: _email.text.trim()),
-                      ),
-                    ),
-                    style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        minimumSize: const Size(0, AppSpacing.minTouchTarget)),
-                    child: Text('Forgot password?',
-                        style: AppTypography.secondary
-                            .copyWith(color: AppColors.primary)),
-                  ),
-                ],
-              ),
-
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _busy ? null : _submit,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: _busy
-                      ? SizedBox(
-                          key: ValueKey('busy'),
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.onPrimary),
-                        )
-                      : Text(_isSignUp ? 'Create account' : 'Sign in',
-                          key: ValueKey(_mode)),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _guestRow() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            const Expanded(child: Divider(color: Colors.white24)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              child: Text('OR',
-                  style: AppTypography.label.copyWith(
-                      color: Colors.white38, letterSpacing: 1.6)),
-            ),
-            const Expanded(child: Divider(color: Colors.white24)),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        if (widget.continueToTable)
-          SizedBox(
-            width: double.infinity,
-            height: AppSpacing.buttonHeight,
-            child: OutlinedButton.icon(
-              onPressed: _continueAsGuest,
-              icon: const Icon(Icons.person_outline, size: 20),
-              label: const Text('Continue as a guest'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Colors.white24),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-                ),
-              ),
-            ),
-          ),
-        const SizedBox(height: AppSpacing.md),
-        TextButton(
-          onPressed: () =>
-              _switchTo(_isSignUp ? AuthMode.signIn : AuthMode.signUp),
-          child: RichText(
-            text: TextSpan(
-              style: AppTypography.secondary.copyWith(color: Colors.white54),
-              children: [
-                TextSpan(
-                    text: _isSignUp
-                        ? 'Already with Robomos? '
-                        : 'New to Robomos? '),
-                TextSpan(
-                  text: _isSignUp ? 'Sign in' : 'Create an account',
-                  style: AppTypography.secondary.copyWith(
-                      color: AppColors.primary, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------- pieces
-
-/// A soft saffron glow behind the top of the screen, so the dark background
-/// is not flat.
-class _Glow extends StatelessWidget {
-  const _Glow();
-
-  @override
-  Widget build(BuildContext context) {
-    SettingsScope.watch(context);
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: const Alignment(0, -0.75),
-              radius: 1.0,
-              colors: [
-                AppColors.primary.withValues(alpha: 0.18),
-                AppColors.header.withValues(alpha: 0),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Brand extends StatelessWidget {
-  const _Brand();
-
-  @override
-  Widget build(BuildContext context) {
-    SettingsScope.watch(context);
-    return Column(
-      children: [
-        const RobomosWordmark(size: 64),
-      ],
-    );
-  }
-}
-
-class _Heading extends StatelessWidget {
-  const _Heading({required this.isSignUp});
-
-  final bool isSignUp;
-
-  @override
-  Widget build(BuildContext context) {
-    SettingsScope.watch(context);
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 260),
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: SlideTransition(
-          position: Tween<Offset>(
-                  begin: const Offset(0, 0.25), end: Offset.zero)
-              .animate(animation),
-          child: child,
-        ),
-      ),
-      child: Column(
-        key: ValueKey(isSignUp),
-        children: [
-          Text(isSignUp ? 'Make it yours.' : 'Welcome back.',
-              textAlign: TextAlign.center,
-              style: AppTypography.screenTitle
-                  .copyWith(color: Colors.white, fontSize: 32)),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            isSignUp
-                ? 'Save your bowls, keep your orders, skip the queue.'
-                : 'Pick up where you left off \u2014 your bowls are waiting.',
-            textAlign: TextAlign.center,
-            style: AppTypography.secondary.copyWith(color: Colors.white54),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The sliding pill. The indicator animates between halves rather than
-/// snapping, which is what makes the switch feel considered.
-class _ModeToggle extends StatelessWidget {
-  const _ModeToggle({required this.mode, required this.onChanged});
-
-  final AuthMode mode;
-  final ValueChanged<AuthMode> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    SettingsScope.watch(context);
-    return Container(
-      height: AppSpacing.minTouchTarget,
-      padding: const EdgeInsets.all(AppSpacing.xs),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
-      ),
-      child: LayoutBuilder(
+      // Matches the sheet, so the strip the sheet is lifted over is invisible.
+      backgroundColor: AppColors.card,
+      body: LayoutBuilder(
         builder: (context, constraints) {
-          final half = constraints.maxWidth / 2;
-          return Stack(
+          final sceneHeight = (constraints.maxHeight *
+                  (_isSignUp ? 0.30 : 0.38))
+              .clamp(130.0, 330.0);
+
+          return Column(
             children: [
-              AnimatedAlign(
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeOutCubic,
-                alignment: mode == AuthMode.signIn
-                    ? Alignment.centerLeft
-                    : Alignment.centerRight,
-                child: Container(
-                  width: half,
-                  height: double.infinity,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
-                  ),
+              SizedBox(
+                height: sceneHeight,
+                width: double.infinity,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // The scene repaints every frame, so it is boundaried off
+                    // from the form, which does not.
+                    RepaintBoundary(
+                      child: AnimatedBuilder(
+                        animation: _scene,
+                        builder: (context, _) =>
+                            KitchenScene(t: _scene.value, still: still),
+                      ),
+                    ),
+                    SafeArea(
+                      child: Align(
+                        alignment: Alignment.topLeft,
+                        child: _stagger(0.00, const _TopBar(), rise: 10),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Row(
-                children: [
-                  _half('Sign in', AuthMode.signIn),
-                  _half('Sign up', AuthMode.signUp),
-                ],
+              Expanded(
+                child: Transform.translate(
+                  offset: const Offset(0, -AppSpacing.xl),
+                  child: _stagger(0.12, _sheet(), rise: 26),
+                ),
               ),
             ],
           );
@@ -542,37 +244,206 @@ class _ModeToggle extends StatelessWidget {
     );
   }
 
-  Widget _half(String label, AuthMode value) {
-    final selected = mode == value;
-    return Expanded(
-      child: Semantics(
-        selected: selected,
-        button: true,
-        child: InkWell(
-          onTap: () => onChanged(value),
-          borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
-          child: Center(
-            child: AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              style: AppTypography.body.copyWith(
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                // Dark text on saffron, white elsewhere. Same contrast rule
-                // as the rest of the app.
-                color: selected ? AppColors.base : Colors.white70,
+  Widget _sheet() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusSheet)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSpacing.radiusSheet)),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.xl,
+                AppSpacing.xl, AppSpacing.xl),
+            children: [
+              _Headline(isSignUp: _isSignUp),
+              const SizedBox(height: AppSpacing.xl),
+              if (_failure != null) ...[
+                _FailureNote(message: _failure!),
+                const SizedBox(height: AppSpacing.md),
+              ],
+              // Keeps the form growing and shrinking smoothly as the extra
+              // fields appear between the two modes.
+              AnimatedSize(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: Column(children: _fields()),
               ),
-              child: Text(label),
-            ),
+              const SizedBox(height: AppSpacing.lg),
+              _SubmitButton(
+                label: _isSignUp ? 'Create account' : 'Log in',
+                busy: _busy,
+                onTap: _submit,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              _SwitchPrompt(
+                isSignUp: _isSignUp,
+                onTap: () => _switchTo(
+                    _isSignUp ? AuthMode.signIn : AuthMode.signUp),
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
           ),
         ),
       ),
     );
   }
+
+  List<Widget> _fields() {
+    return [
+      if (_isSignUp)
+        _Field(
+          key: const ValueKey('name'),
+          controller: _name,
+          hint: 'Full name',
+          icon: Icons.person_outline,
+          validator: _validateName,
+          textCapitalization: TextCapitalization.words,
+        ),
+      _Field(
+        controller: _email,
+        hint: 'Email',
+        icon: Icons.mail_outline,
+        keyboardType: TextInputType.emailAddress,
+        validator: _validateEmail,
+      ),
+      _Field(
+        controller: _password,
+        hint: 'Password',
+        icon: Icons.lock_outline,
+        obscure: _obscure,
+        validator: _validatePassword,
+        trailing: IconButton(
+          onPressed: () => setState(() => _obscure = !_obscure),
+          icon: Icon(
+              _obscure
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              size: 21,
+              color: AppColors.textSecondary),
+          tooltip: _obscure ? 'Show password' : 'Hide password',
+        ),
+      ),
+      if (_isSignUp)
+        _Field(
+          key: const ValueKey('confirm'),
+          controller: _confirm,
+          hint: 'Confirm password',
+          icon: Icons.lock_outline,
+          obscure: _obscure,
+          validator: _validateConfirm,
+        ),
+      if (!_isSignUp)
+        _OptionsRow(
+          keepSignedIn: _keepSignedIn,
+          onKeepChanged: (v) => setState(() => _keepSignedIn = v),
+          onForgot: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ForgotPasswordScreen(email: _email.text.trim()),
+            ),
+          ),
+        ),
+    ];
+  }
 }
 
-/// A field that lights up on focus and turns red with an inline message when
-/// validation fails.
-class _AuthField extends StatefulWidget {
-  const _AuthField({
+// ----------------------------------------------------------------- top bar
+
+/// A white circular back button and the brand, floating on the illustration.
+class _TopBar extends StatelessWidget {
+  const _TopBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 0),
+      child: Row(
+        children: [
+          Material(
+            color: AppColors.card,
+            shape: const CircleBorder(),
+            child: InkWell(
+              onTap: () => Navigator.pop(context),
+              customBorder: const CircleBorder(),
+              child: SizedBox(
+                width: AppSpacing.minTouchTarget,
+                height: AppSpacing.minTouchTarget,
+                child: Icon(Icons.arrow_back,
+                    size: 21, color: AppColors.base),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          RobomosLogo(size: 36, onDark: false),
+          const SizedBox(width: AppSpacing.sm),
+          Text('Robomos',
+              style: AppTypography.cardTitle.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.base,
+                  shadows: [
+                    Shadow(
+                        color: AppColors.card.withValues(alpha: 0.8),
+                        blurRadius: 8),
+                  ])),
+        ],
+      ),
+    );
+  }
+}
+
+// --------------------------------------------------------------- headline
+
+class _Headline extends StatelessWidget {
+  const _Headline({required this.isSignUp});
+
+  final bool isSignUp;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 280),
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: SlideTransition(
+          position:
+              Tween<Offset>(begin: const Offset(0, 0.25), end: Offset.zero)
+                  .animate(animation),
+          child: child,
+        ),
+      ),
+      child: Column(
+        key: ValueKey(isSignUp),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isSignUp ? 'Create account' : 'Welcome back',
+              style: AppTypography.screenTitle
+                  .copyWith(fontSize: 30, height: 1.1, letterSpacing: -0.6)),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            isSignUp
+                ? 'Save your bowls, keep your orders and skip the queue.'
+                : 'Log in to pick up where you left off.',
+            style: AppTypography.secondary.copyWith(height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ------------------------------------------------------------------ field
+
+/// Filled, borderless and softly rounded, following the reference. A filled
+/// field reads as something to type into without needing an outline, which
+/// keeps four of them on one screen from looking like a grid of boxes.
+class _Field extends StatefulWidget {
+  const _Field({
     super.key,
     required this.controller,
     required this.hint,
@@ -581,6 +452,7 @@ class _AuthField extends StatefulWidget {
     this.keyboardType,
     this.validator,
     this.trailing,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   final TextEditingController controller;
@@ -590,12 +462,13 @@ class _AuthField extends StatefulWidget {
   final TextInputType? keyboardType;
   final String? Function(String?)? validator;
   final Widget? trailing;
+  final TextCapitalization textCapitalization;
 
   @override
-  State<_AuthField> createState() => _AuthFieldState();
+  State<_Field> createState() => _FieldState();
 }
 
-class _AuthFieldState extends State<_AuthField> {
+class _FieldState extends State<_Field> {
   final FocusNode _focus = FocusNode();
   bool _focused = false;
 
@@ -613,43 +486,43 @@ class _AuthFieldState extends State<_AuthField> {
 
   @override
   Widget build(BuildContext context) {
-    SettingsScope.watch(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: FormField<String>(
         validator: (_) => widget.validator?.call(widget.controller.text),
         builder: (field) {
           final hasError = field.errorText != null;
-          final borderColour = hasError
-              ? AppColors.error
-              : _focused
-                  ? AppColors.primary
-                  : Colors.white.withValues(alpha: 0.12);
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                height: AppSpacing.inputHeight,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                height: 62,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 decoration: BoxDecoration(
                   color: hasError
-                      ? AppColors.error.withValues(alpha: 0.08)
-                      : Colors.white.withValues(alpha: 0.04),
+                      ? AppColors.error.withValues(alpha: 0.06)
+                      : AppColors.surface,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
                   border: Border.all(
-                      color: borderColour, width: _focused || hasError ? 1.6 : 1),
+                    color: hasError
+                        ? AppColors.error
+                        : _focused
+                            ? AppColors.primary
+                            : Colors.transparent,
+                    width: 1.8,
+                  ),
                 ),
                 child: Row(
                   children: [
                     Icon(widget.icon,
-                        size: 20,
+                        size: 21,
                         color: hasError
                             ? AppColors.error
                             : _focused
                                 ? AppColors.primary
-                                : Colors.white38),
+                                : AppColors.textSecondary),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: TextField(
@@ -657,10 +530,12 @@ class _AuthFieldState extends State<_AuthField> {
                         focusNode: _focus,
                         obscureText: widget.obscure,
                         keyboardType: widget.keyboardType,
-                        style:
-                            AppTypography.body.copyWith(color: Colors.white),
+                        textCapitalization: widget.textCapitalization,
+                        style: AppTypography.body,
                         cursorColor: AppColors.primary,
-                        onChanged: (v) {
+                        onChanged: (_) {
+                          // Clear the error as soon as it is fixed, rather
+                          // than making the person submit again to find out.
                           if (hasError) field.validate();
                         },
                         decoration: InputDecoration(
@@ -672,7 +547,7 @@ class _AuthFieldState extends State<_AuthField> {
                           contentPadding: EdgeInsets.zero,
                           hintText: widget.hint,
                           hintStyle: AppTypography.body
-                              .copyWith(color: Colors.white38),
+                              .copyWith(color: AppColors.textSecondary),
                         ),
                       ),
                     ),
@@ -686,15 +561,17 @@ class _AuthFieldState extends State<_AuthField> {
                 child: hasError
                     ? Padding(
                         padding: const EdgeInsets.only(
-                            top: AppSpacing.xs, left: AppSpacing.xs),
+                            top: AppSpacing.xs, left: AppSpacing.md),
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline,
+                            Icon(Icons.error_outline,
                                 size: 14, color: AppColors.error),
                             const SizedBox(width: AppSpacing.xs),
-                            Text(field.errorText!,
-                                style: AppTypography.secondary
-                                    .copyWith(color: AppColors.error)),
+                            Expanded(
+                              child: Text(field.errorText!,
+                                  style: AppTypography.label
+                                      .copyWith(color: AppColors.error)),
+                            ),
                           ],
                         ),
                       )
@@ -703,6 +580,192 @@ class _AuthFieldState extends State<_AuthField> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+// ----------------------------------------------------------------- pieces
+
+class _OptionsRow extends StatelessWidget {
+  const _OptionsRow({
+    required this.keepSignedIn,
+    required this.onKeepChanged,
+    required this.onForgot,
+  });
+
+  final bool keepSignedIn;
+  final ValueChanged<bool> onKeepChanged;
+  final VoidCallback onForgot;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: () => onKeepChanged(!keepSignedIn),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: keepSignedIn
+                          ? AppColors.primary
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: keepSignedIn
+                              ? AppColors.primary
+                              : AppColors.border,
+                          width: 1.8),
+                    ),
+                    child: keepSignedIn
+                        ? Icon(Icons.check,
+                            size: 15, color: AppColors.onPrimary)
+                        : null,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text('Keep me signed in', style: AppTypography.secondary),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          TextButton(
+            onPressed: onForgot,
+            style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                minimumSize: const Size(0, AppSpacing.minTouchTarget)),
+            child: Text('Forgot password?',
+                style: AppTypography.secondary.copyWith(
+                    color: AppColors.primary, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A tall pill with the arrow, matching the reference. The arrow slides a
+/// little on press, which is the only feedback a flat button gets.
+class _SubmitButton extends StatelessWidget {
+  const _SubmitButton({
+    required this.label,
+    required this.busy,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 62,
+      child: ElevatedButton(
+        onPressed: busy ? null : onTap,
+        style: ElevatedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+          ),
+        ),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: busy
+              ? SizedBox(
+                  key: const ValueKey('busy'),
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2.4, color: AppColors.onPrimary),
+                )
+              : Row(
+                  key: ValueKey(label),
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(label,
+                        style: AppTypography.body.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.onPrimary)),
+                    const SizedBox(width: AppSpacing.sm),
+                    Icon(Icons.arrow_forward,
+                        size: 19, color: AppColors.onPrimary),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FailureNote extends StatelessWidget {
+  const _FailureNote({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
+        border: Border.all(color: AppColors.error),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, size: 20, color: AppColors.error),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(message,
+                style:
+                    AppTypography.secondary.copyWith(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwitchPrompt extends StatelessWidget {
+  const _SwitchPrompt({required this.isSignUp, required this.onTap});
+
+  final bool isSignUp;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(
+            minimumSize: const Size(0, AppSpacing.minTouchTarget)),
+        child: RichText(
+          text: TextSpan(
+            style: AppTypography.secondary,
+            children: [
+              TextSpan(
+                  text: isSignUp
+                      ? 'Already have an account? '
+                      : "Don't have an account? "),
+              TextSpan(
+                text: isSignUp ? 'Log in' : 'Create an account',
+                style: AppTypography.secondary.copyWith(
+                    color: AppColors.primary, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

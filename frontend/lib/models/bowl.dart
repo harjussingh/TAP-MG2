@@ -12,6 +12,10 @@ class Bowl {
   static const int maxVegetables = 5;
   static const int maxItems = 8;
 
+  /// What the customer called this bowl. Empty until they save it and name
+  /// it, so the builder itself never has to show a name.
+  String name = '';
+
   Ingredient? base;
   Ingredient? protein;
   bool largePortion = false;
@@ -67,8 +71,25 @@ class Bowl {
 
   int get prepMinutes => 4 + (itemCount ~/ 3);
 
+  /// What to show in a list. Falls back to the ingredients rather than to a
+  /// position, so two unnamed recipes never look identical.
+  String get displayName => name.trim().isEmpty ? _suggestedName : name.trim();
+
+  /// A first guess at a name, offered when the customer saves.
+  String get _suggestedName {
+    if (protein == null && base == null) return 'Custom bowl';
+    final parts = [
+      if (protein != null) protein!.name,
+      if (base != null) base!.name,
+    ];
+    return parts.join(' on ');
+  }
+
+  String get suggestedName => _suggestedName;
+
   Bowl copy() {
     final b = Bowl()
+      ..name = name
       ..base = base
       ..protein = protein
       ..largePortion = largePortion

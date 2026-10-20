@@ -132,9 +132,9 @@ class _DishCardSkeletonState extends State<DishCardSkeleton>
         opacity: reduceMotion
             ? const AlwaysStoppedAnimation(0.6)
             : Tween<double>(begin: 0.45, end: 0.85).animate(_controller),
-        child: Row(
+        child: const Row(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

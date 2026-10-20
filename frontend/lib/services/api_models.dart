@@ -10,6 +10,18 @@ String formatCents(int cents, {String currency = 'AUD'}) {
   return '$symbol${(cents / 100).toStringAsFixed(2)}';
 }
 
+/// The API reports energy in calories. Australian menu labelling uses
+/// kilojoules, and so does section 7.1.6 of the report. One nutritional
+/// calorie is 4.184 kJ.
+///
+/// Converting here rather than asking the backend for a second field keeps
+/// the change on our side of the wire, which is what KAN-7 settled on.
+int caloriesToKilojoules(int calories) => (calories * 4.184).round();
+
+// Formatting stays in widgets/dish_card.dart, where formatKilojoules()
+// already lives. Converting here and formatting there keeps one formatter
+// for the whole app: formatKilojoules(caloriesToKilojoules(item.calories)).
+
 enum UserRole { customer, staff, admin }
 
 enum OrderType {

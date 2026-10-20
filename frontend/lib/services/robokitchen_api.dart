@@ -91,8 +91,27 @@ class RoboKitchenApi {
 
   /// The printed QR points at FRONTEND_URL/?table=CODE. Read the code from
   /// the deep link, then call this.
+  ///
+  /// Kept for the per-table QR codes an admin can still print. The flow the
+  /// client asked for is [tableByNumber].
   Future<TableScan> scanTable(String code) async =>
       TableScan.fromJson(await _c.get('/tables/scan/$code') as Map<String, dynamic>);
+
+  /// The table numbers a customer may type, lowest first.
+  ///
+  /// Worth fetching once on the table screen so a wrong number can be
+  /// refused before the keypad is even submitted.
+  Future<List<int>> tableNumbers() async =>
+      ((await _c.get('/tables/numbers')) as List<dynamic>)
+          .map((n) => n as int)
+          .toList();
+
+  /// Single-QR flow: the customer types the number printed on their table.
+  ///
+  /// Returns exactly what a scan returns, so both routes into the app give
+  /// the same context. Throws on 404 when the number is not a live table.
+  Future<TableScan> tableByNumber(int number) async => TableScan.fromJson(
+      await _c.get('/tables/by-number/$number') as Map<String, dynamic>);
 
   // ------------------------------------------------------------------ menu
 
@@ -178,10 +197,19 @@ class RoboKitchenApi {
   Future<Cart> clearCart() async =>
       Cart.fromJson(await _c.delete('/cart') as Map<String, dynamic>);
 
-  /// Attach the scanned table, or switch to takeaway.
-  Future<Cart> setCartContext({String? tableCode, required OrderType type}) async =>
+  /// Attach the table, or switch to takeaway.
+  ///
+  /// Give either [tableCode] (from a scanned QR) or [tableNumber] (typed on
+  /// the table screen); the backend resolves either to the same table. Pass
+  /// neither for takeaway, which clears the table on the cart.
+  Future<Cart> setCartContext({
+    String? tableCode,
+    int? tableNumber,
+    required OrderType type,
+  }) async =>
       Cart.fromJson(await _c.put('/cart/context', body: {
         'table_code': tableCode,
+        'table_number': tableNumber,
         'order_type': type.wire,
       }) as Map<String, dynamic>);
 

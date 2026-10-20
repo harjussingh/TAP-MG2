@@ -7,11 +7,13 @@ import '../theme/app_settings.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../widgets/dish_card.dart';
+import '../widgets/name_prompt.dart';
 import '../widgets/state_views.dart';
 import 'account_detail_screens.dart';
+import 'bowl_builder_screen.dart';
 import 'edit_details_screen.dart';
 import 'order_tracking_screen.dart';
-import 'qr_screen.dart';
+import 'intro_screen.dart';
 import 'settings_screen.dart';
 import 'auth_screen.dart';
 import 'review_screen.dart';
@@ -127,36 +129,133 @@ class SavedScreen extends StatelessWidget {
       separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.cardGap),
       itemBuilder: (context, index) {
         final bowl = state.savedBowls[index];
-        return Container(
-          padding: const EdgeInsets.all(AppSpacing.cardPadding),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-          ),
-          child: Row(
-            children: [
-              EmojiTile(
-                  emoji: '\u{1F963}', colour: AppColors.tileBlue, size: 56),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('My bowl ${index + 1}',
-                        style: AppTypography.cardTitle),
-                    Text(bowl.summary, style: AppTypography.secondary),
-                  ],
-                ),
+        return Material(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            // Reopens the builder on its review step with a copy of this
+            // bowl, so the recipe can be checked and adjusted before it is
+            // sent rather than going straight into the cart unseen.
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => BowlBuilderScreen(startFrom: bowl),
               ),
-              Text(formatPrice(bowl.price),
-                  style: AppTypography.cardTitle
-                      .copyWith(fontWeight: FontWeight.w700)),
-            ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.cardPadding),
+              child: Row(
+                children: [
+                  EmojiTile(
+                      emoji: '\u{1F963}', colour: AppColors.tileBlue, size: 56),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          bowl.displayName,
+                          style: AppTypography.cardTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(bowl.summary, style: AppTypography.secondary),
+                      ],
+                    ),
+                  ),
+                  Text(formatPrice(bowl.price),
+                      style: AppTypography.cardTitle
+                          .copyWith(fontWeight: FontWeight.w700)),
+                  // One trailing control, as before. Rename and Remove live
+                  // inside it rather than as two icons, which would crowd
+                  // the row and push the price off its edge.
+                  PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
+                    tooltip: 'More',
+                    color: AppColors.card,
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(AppSpacing.radiusCard),
+                    ),
+                    onSelected: (choice) => choice == 'rename'
+                        ? _renameSaved(context, state, index)
+                        : _removeSaved(context, state, index),
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: 'rename',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined,
+                                size: 19, color: AppColors.base),
+                            const SizedBox(width: AppSpacing.md),
+                            Text('Rename', style: AppTypography.body),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'remove',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.delete_outline,
+                                size: 19, color: AppColors.error),
+                            const SizedBox(width: AppSpacing.md),
+                            Text('Remove',
+                                style: AppTypography.body
+                                    .copyWith(color: AppColors.error)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },
     );
   }
+}
+
+/// Confirms before dropping a saved recipe, because there is no undo and the
+/// bowl took six steps to build.
+Future<void> _removeSaved(
+    BuildContext context, AppState state, int index) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      backgroundColor: AppColors.card,
+      title: const Text('Remove this recipe?'),
+      content: Text('It will not affect any order you have already placed.',
+          style: AppTypography.body),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep it')),
+        ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Remove')),
+      ],
+    ),
+  );
+
+  if (confirmed == true) state.removeSavedBowl(index);
+}
+
+/// Renames a saved recipe in place.
+Future<void> _renameSaved(
+    BuildContext context, AppState state, int index) async {
+  if (index < 0 || index >= state.savedBowls.length) return;
+  final bowl = state.savedBowls[index];
+
+  final name = await promptForBowlName(
+    context,
+    initial: bowl.name.isEmpty ? bowl.suggestedName : bowl.name,
+    title: 'Rename this recipe',
+  );
+  if (name == null) return;
+
+  state.renameSavedBowl(index, name);
 }
 
 class ProfileScreen extends StatelessWidget {
@@ -305,7 +404,7 @@ Future<void> _confirmSignOut(BuildContext context) async {
   if (confirmed != true || !context.mounted) return;
   state.signOut();
   Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute<void>(builder: (_) => const QrScreen()),
+    MaterialPageRoute<void>(builder: (_) => const IntroScreen()),
     (route) => false,
   );
 }
@@ -320,17 +419,21 @@ class _Tile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      decoration: BoxDecoration(
+    // A Material rather than a decorated Container: the tap ripple is drawn
+    // by the nearest Material above it, so an opaque box sitting on top of
+    // that Material hides the ripple completely.
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Material(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: AppColors.base),
-        title: Text(label, style: AppTypography.body),
-        trailing: Icon(Icons.chevron_right, color: AppColors.textSecondary),
-        onTap: onTap,
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          leading: Icon(icon, color: AppColors.base),
+          title: Text(label, style: AppTypography.body),
+          trailing: Icon(Icons.chevron_right, color: AppColors.textSecondary),
+          onTap: onTap,
+        ),
       ),
     );
   }

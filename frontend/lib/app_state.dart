@@ -89,8 +89,26 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void saveBowl(Bowl bowl) {
-    savedBowls.add(bowl.copy());
+  /// Saves a copy, so later edits in the builder do not quietly rewrite the
+  /// recipe already in the list.
+  void saveBowl(Bowl bowl, {String? name}) {
+    final saved = bowl.copy();
+    if (name != null) saved.name = name.trim();
+    savedBowls.add(saved);
+    notifyListeners();
+  }
+
+  void removeSavedBowl(int index) {
+    if (index < 0 || index >= savedBowls.length) return;
+    savedBowls.removeAt(index);
+    notifyListeners();
+  }
+
+  /// Renames a saved recipe. An empty name is allowed: the list then falls
+  /// back to the ingredients, which is more use than a blank row.
+  void renameSavedBowl(int index, String name) {
+    if (index < 0 || index >= savedBowls.length) return;
+    savedBowls[index].name = name.trim();
     notifyListeners();
   }
 

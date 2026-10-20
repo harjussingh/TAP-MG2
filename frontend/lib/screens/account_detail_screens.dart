@@ -44,24 +44,25 @@ class _DietaryPreferencesScreenState extends State<DietaryPreferencesScreen> {
           ),
           const SizedBox(height: AppSpacing.lg),
           for (final option in _options)
-            Container(
-              margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-              decoration: BoxDecoration(
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Material(
                 color: AppColors.card,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-              ),
-              child: CheckboxListTile(
-                value: _selected.contains(option),
-                activeColor: AppColors.primary,
-                checkColor: AppColors.onPrimary,
-                title: Text(option, style: AppTypography.body),
-                onChanged: (on) => setState(() {
-                  if (on ?? false) {
-                    _selected.add(option);
-                  } else {
-                    _selected.remove(option);
-                  }
-                }),
+                clipBehavior: Clip.antiAlias,
+                child: CheckboxListTile(
+                  value: _selected.contains(option),
+                  activeColor: AppColors.primary,
+                  checkColor: AppColors.onPrimary,
+                  title: Text(option, style: AppTypography.body),
+                  onChanged: (on) => setState(() {
+                    if (on ?? false) {
+                      _selected.add(option);
+                    } else {
+                      _selected.remove(option);
+                    }
+                  }),
+                ),
               ),
             ),
           const SizedBox(height: AppSpacing.lg),
@@ -160,18 +161,19 @@ class _Switch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Material(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-      ),
-      child: SwitchListTile(
-        value: value,
-        onChanged: onChanged,
-        activeThumbColor: AppColors.primary,
-        title: Text(title, style: AppTypography.body),
-        subtitle: Text(subtitle, style: AppTypography.secondary),
+        clipBehavior: Clip.antiAlias,
+        child: SwitchListTile(
+          value: value,
+          onChanged: onChanged,
+          activeThumbColor: AppColors.primary,
+          title: Text(title, style: AppTypography.body),
+          subtitle: Text(subtitle, style: AppTypography.secondary),
+        ),
       ),
     );
   }
