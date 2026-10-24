@@ -1265,6 +1265,8 @@ class _ReviewState extends State<_Review> {
     final onEdit = widget.onEdit;
     final onSave = widget.onSave;
     final saveLabel = widget.saveLabel;
+    // Saving a recipe needs an account, so a guest never sees the save button.
+    final isMember = AppScope.of(context).isMember;
     return ListView(
       // shrinkWrap so the review hugs its rows and the footer sits right
       // under "Send to machine", with no empty space above it.
@@ -1339,20 +1341,22 @@ class _ReviewState extends State<_Review> {
           onEdit: onEdit,
           active: _active,
         ),
-        const SizedBox(height: AppSpacing.md),
-        OutlinedButton.icon(
-          onPressed: onSave,
-          icon: const Icon(Icons.bookmark_outline, size: 20),
-          label: Text(saveLabel),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(0, AppSpacing.buttonHeight),
-            foregroundColor: AppColors.base,
-            side: BorderSide(color: AppColors.border),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+        if (isMember) ...[
+          const SizedBox(height: AppSpacing.md),
+          OutlinedButton.icon(
+            onPressed: onSave,
+            icon: const Icon(Icons.bookmark_outline, size: 20),
+            label: Text(saveLabel),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, AppSpacing.buttonHeight),
+              foregroundColor: AppColors.base,
+              side: BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }

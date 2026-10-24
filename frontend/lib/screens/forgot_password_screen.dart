@@ -65,45 +65,102 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
+    // Theme-aware entry screen: dark in dark mode, and light like the rest of
+    // the app in light mode. Colours come from AppColors tokens, not fixed
+    // white on a forced-dark band.
     return Scaffold(
-      backgroundColor: AppColors.header,
-      body: Stack(
-        children: [
-          const AuthGlow(),
-          SafeArea(
-            child: Column(
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  ),
-                ),
-                Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 320),
-                    transitionBuilder: (child, animation) => FadeTransition(
-                      opacity: animation,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                                begin: const Offset(0.12, 0), end: Offset.zero)
-                            .animate(animation),
-                        child: child,
-                      ),
-                    ),
-                    child: _sent ? _sentPane() : _formPane(),
-                  ),
-                ),
-              ],
+      backgroundColor: AppColors.surface,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: Icon(Icons.arrow_back, color: AppColors.base),
+              ),
             ),
-          ),
-        ],
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 320),
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                            begin: const Offset(0.12, 0), end: Offset.zero)
+                        .animate(animation),
+                    child: child,
+                  ),
+                ),
+                child: _sent ? _sentPane() : _formPane(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _formPane() => AuthPane(
+  /// Theme-aware pane, mirroring the shared AuthPane layout but using palette
+  /// tokens so it reads correctly in both light and dark mode.
+  Widget _pane({
+    required Key key,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Widget> children,
+  }) =>
+      ListView(
+        key: key,
+        padding: const EdgeInsets.fromLTRB(AppSpacing.screenPadding,
+            AppSpacing.xl, AppSpacing.screenPadding, AppSpacing.xl),
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+              border:
+                  Border.all(color: AppColors.primary.withValues(alpha: 0.45)),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 26),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Text(title,
+              style: AppTypography.screenTitle
+                  .copyWith(color: AppColors.base, fontSize: 30)),
+          const SizedBox(height: AppSpacing.sm),
+          Text(subtitle,
+              style: AppTypography.secondary
+                  .copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: AppSpacing.xl),
+          ...children,
+        ],
+      );
+
+  Widget _primaryButton({
+    required String label,
+    required bool busy,
+    required VoidCallback? onPressed,
+  }) =>
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: busy ? null : onPressed,
+          child: busy
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.onPrimary),
+                )
+              : Text(label),
+        ),
+      );
+
+  Widget _formPane() => _pane(
         key: const ValueKey('form'),
         icon: Icons.lock_outline,
         title: 'Forgot password?',
@@ -111,27 +168,34 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             'It happens. Enter the email on your account and we will send you '
             'a link to set a new password.',
         children: [
-          AuthField(
+          TextField(
             controller: _email,
-            hint: 'Email address',
-            icon: Icons.mail_outline,
             keyboardType: TextInputType.emailAddress,
-            error: _error,
+            style: AppTypography.body.copyWith(color: AppColors.base),
+            cursorColor: AppColors.primary,
             onChanged: (_) {
               if (_error != null) setState(() => _error = null);
             },
+            decoration: InputDecoration(
+              hintText: 'Email address',
+              prefixIcon:
+                  Icon(Icons.mail_outline, color: AppColors.textSecondary),
+              errorText: _error,
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          AuthButton(label: 'Send reset link', busy: _busy, onPressed: _send),
+          _primaryButton(
+              label: 'Send reset link', busy: _busy, onPressed: _send),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Remembered it? Log in',
-                style: AppTypography.secondary.copyWith(color: Colors.white54)),
+                style: AppTypography.secondary
+                    .copyWith(color: AppColors.textSecondary)),
           ),
         ],
       );
 
-  Widget _sentPane() => AuthPane(
+  Widget _sentPane() => _pane(
         key: const ValueKey('sent'),
         icon: Icons.mark_email_read_outlined,
         title: 'Check your email',
@@ -142,9 +206,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
+              color: AppColors.card,
               borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+              border: Border.all(color: AppColors.border),
             ),
             child: Row(
               children: [
@@ -156,14 +220,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     'No email after a few minutes? Check your spam folder, or '
                     'try again in case of a typo.',
                     style: AppTypography.secondary
-                        .copyWith(color: Colors.white54),
+                        .copyWith(color: AppColors.textSecondary),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          AuthButton(
+          _primaryButton(
             label: 'Send again',
             busy: _busy,
             onPressed: () => setState(() => _sent = false),
@@ -171,7 +235,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Back to log in',
-                style: AppTypography.secondary.copyWith(color: Colors.white54)),
+                style: AppTypography.secondary
+                    .copyWith(color: AppColors.textSecondary)),
           ),
         ],
       );

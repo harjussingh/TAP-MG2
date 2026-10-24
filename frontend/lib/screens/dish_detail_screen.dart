@@ -79,6 +79,8 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
+    // Saving a bowl needs an account, so a guest never sees the save control.
+    final isMember = AppScope.of(context).isMember;
 
     return Scaffold(
       // The sheet's rounded top corners reveal this background in two small
@@ -94,6 +96,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
             saved: _saved,
             onBack: () => Navigator.pop(context),
             onSave: () => setState(() => _saved = !_saved),
+            showSave: isMember,
           ),
           Expanded(
             child: Container(
@@ -142,6 +145,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
         saved: _saved,
         onSave: () => setState(() => _saved = !_saved),
         onPrimary: dish.isCustom ? _openBuilder : _addToCart,
+        showSave: isMember,
       ),
     );
   }
@@ -156,6 +160,7 @@ class _Hero extends StatelessWidget {
     required this.saved,
     required this.onBack,
     required this.onSave,
+    required this.showSave,
   });
 
   final Dish dish;
@@ -163,6 +168,7 @@ class _Hero extends StatelessWidget {
   final bool saved;
   final VoidCallback onBack;
   final VoidCallback onSave;
+  final bool showSave;
 
   @override
   Widget build(BuildContext context) {
@@ -201,12 +207,13 @@ class _Hero extends StatelessWidget {
                     tooltip: 'Back',
                     onColour: palette.onColour,
                   ),
-                  _RoundButton(
-                    icon: saved ? Icons.favorite : Icons.favorite_border,
-                    onTap: onSave,
-                    tooltip: saved ? 'Remove from saved' : 'Save this bowl',
-                    onColour: palette.onColour,
-                  ),
+                  if (showSave)
+                    _RoundButton(
+                      icon: saved ? Icons.favorite : Icons.favorite_border,
+                      onTap: onSave,
+                      tooltip: saved ? 'Remove from saved' : 'Save this bowl',
+                      onColour: palette.onColour,
+                    ),
                 ],
               ),
             ),
@@ -467,6 +474,7 @@ class _BottomBar extends StatelessWidget {
     required this.saved,
     required this.onSave,
     required this.onPrimary,
+    required this.showSave,
   });
 
   final Dish dish;
@@ -474,6 +482,7 @@ class _BottomBar extends StatelessWidget {
   final bool saved;
   final VoidCallback onSave;
   final VoidCallback onPrimary;
+  final bool showSave;
 
   @override
   Widget build(BuildContext context) {
@@ -489,24 +498,26 @@ class _BottomBar extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.screenPadding),
           child: Row(
             children: [
-              InkWell(
-                onTap: onSave,
-                customBorder: const CircleBorder(),
-                child: Container(
-                  width: AppSpacing.buttonHeight,
-                  height: AppSpacing.buttonHeight,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Icon(
-                    saved ? Icons.favorite : Icons.favorite_border,
-                    color: saved ? AppColors.error : AppColors.base,
+              if (showSave) ...[
+                InkWell(
+                  onTap: onSave,
+                  customBorder: const CircleBorder(),
+                  child: Container(
+                    width: AppSpacing.buttonHeight,
+                    height: AppSpacing.buttonHeight,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Icon(
+                      saved ? Icons.favorite : Icons.favorite_border,
+                      color: saved ? AppColors.error : AppColors.base,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.md),
+              ],
               Expanded(
                 child: ElevatedButton(
                   onPressed: unavailable ? null : onPrimary,
