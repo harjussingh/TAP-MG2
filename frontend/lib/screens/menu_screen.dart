@@ -336,7 +336,7 @@ class _BrandBar extends StatelessWidget {
           AppSpacing.md, AppSpacing.screenPadding, AppSpacing.md),
       child: Row(
         children: [
-          RobomosLogo(size: 44, onDark: false),
+          const RobomosLogo(size: 44, onDark: false),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(

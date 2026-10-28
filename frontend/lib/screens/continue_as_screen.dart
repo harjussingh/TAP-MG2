@@ -135,7 +135,7 @@ class _BrandRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        RobomosLogo(size: 38, onDark: false),
+        const RobomosLogo(size: 38, onDark: false),
         const SizedBox(width: AppSpacing.sm),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,

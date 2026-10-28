@@ -38,12 +38,12 @@ Future<(AppState, List<Dish>)> memberState(Map<String, Object> prefs) async {
   final (s, backend) = await fakeAppState(prefs: prefs);
   await s.login(FakeBackend.customerEmail, FakeBackend.customerPassword);
   await s.chooseTable(7);
-  await s.addToCart('itm_teriyaki');
-  await s.addToCart('itm_tofu');
+  s.addToCart('itm_teriyaki');
+  s.addToCart('itm_tofu');
   final order = await s.checkout(method: PaymentMethod.cash);
   backend.advance(order.id, 'ready');
   await s.refreshOrder(order.id);
-  await s.addToCart('itm_miso', quantity: 2);
+  s.addToCart('itm_miso', quantity: 2);
   await s.loadHistory();
   return (s, await s.loadMenu());
 }

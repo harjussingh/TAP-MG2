@@ -41,9 +41,9 @@ class _ShellState extends State<_Shell> {
       // Deliberately not const: a const widget is skipped on rebuild, so the
       // tabs would keep the old palette after a theme change.
       const MenuScreen(),
-      const SafeArea(child: const HistoryScreen()),
-      if (widget.isMember) const SafeArea(child: const SavedScreen()),
-      const SafeArea(child: const ProfileScreen()),
+      const SafeArea(child: HistoryScreen()),
+      if (widget.isMember) const SafeArea(child: SavedScreen()),
+      const SafeArea(child: ProfileScreen()),
     ];
 
     final destinations = <NavigationDestination>[

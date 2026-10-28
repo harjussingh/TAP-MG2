@@ -141,7 +141,7 @@ class _Hero extends StatelessWidget {
                 for (final tag in dish.tags.take(2))
                   _Pill(label: tag.label),
                 if (unavailable)
-                  _Pill(label: 'Out of stock', colour: AppColors.error),
+                  const _Pill(label: 'Out of stock', colour: AppColors.error),
               ],
             ),
           ),

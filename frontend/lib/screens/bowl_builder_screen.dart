@@ -891,7 +891,7 @@ class _CapacityWarning extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: AppColors.error, size: 20),
+          const Icon(Icons.error_outline, color: AppColors.error, size: 20),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(

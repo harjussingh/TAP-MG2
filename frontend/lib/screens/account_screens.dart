@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
-import '../models/order.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_settings.dart';
 import '../theme/app_spacing.dart';

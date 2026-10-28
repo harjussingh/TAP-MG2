@@ -37,7 +37,7 @@ List<Dish> kDishes = [
     paletteKey: 'moss',
     blurb: 'Entirely plant based and not quietly so. Edamame and tofu carry the protein, pickled ginger cuts through, and the miso sesame ties it together.',
   ),
-  Dish(
+  const Dish(
     id: 'tuna-poke',
     name: 'Tuna Poke',
     ingredients: 'Ahi tuna, mango, spring onion',
@@ -52,7 +52,7 @@ List<Dish> kDishes = [
     paletteKey: 'amber',
     blurb: 'The one people come back for. Ahi tuna with ripe mango and spring onion, dressed in a citrus ponzu that keeps it light.',
   ),
-  Dish(
+  const Dish(
     id: 'chicken-teriyaki',
     name: 'Chicken Teriyaki',
     ingredients: 'Teriyaki chicken, edamame, corn',

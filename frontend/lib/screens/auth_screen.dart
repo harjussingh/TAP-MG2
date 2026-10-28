@@ -380,7 +380,7 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          RobomosLogo(size: 36, onDark: false),
+          const RobomosLogo(size: 36, onDark: false),
           const SizedBox(width: AppSpacing.sm),
           Text('Robomos',
               style: AppTypography.cardTitle.copyWith(
@@ -564,7 +564,7 @@ class _FieldState extends State<_Field> {
                             top: AppSpacing.xs, left: AppSpacing.md),
                         child: Row(
                           children: [
-                            Icon(Icons.error_outline,
+                            const Icon(Icons.error_outline,
                                 size: 14, color: AppColors.error),
                             const SizedBox(width: AppSpacing.xs),
                             Expanded(
@@ -724,7 +724,7 @@ class _FailureNote extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, size: 20, color: AppColors.error),
+          const Icon(Icons.error_outline, size: 20, color: AppColors.error),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(message,

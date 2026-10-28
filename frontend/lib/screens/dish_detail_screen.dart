@@ -379,7 +379,7 @@ class _FactStrip extends StatelessWidget {
           _Divider(),
           _Fact(label: 'PREP', value: dish.isCustom ? '4-6 min' : '~4 min'),
           _Divider(),
-          _Fact(label: 'MADE BY', value: 'Machine 2'),
+          const _Fact(label: 'MADE BY', value: 'Machine 2'),
         ],
       ),
     );

@@ -477,7 +477,7 @@ class AuthButton extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           child: busy
               ? SizedBox(
-                  key: ValueKey('busy'),
+                  key: const ValueKey('busy'),
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
