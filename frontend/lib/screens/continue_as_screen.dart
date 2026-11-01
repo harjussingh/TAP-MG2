@@ -54,7 +54,11 @@ class _ContinueAsScreenState extends State<ContinueAsScreen>
   }
 
   void _guest() {
-    AppScope.of(context).setRole(UserRole.guest);
+    AppScope.read(context).setRole(UserRole.guest);
+    _toTable();
+  }
+
+  void _toTable() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const TableNumberScreen()),
     );
@@ -83,13 +87,16 @@ class _ContinueAsScreenState extends State<ContinueAsScreen>
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final state = AppScope.of(context);
+    // A returning member was signed back in with their saved tokens.
+    final member = state.isMember ? state.profile : null;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.screenPadding),
+          padding:
+              const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
           child: Column(
             children: [
               const SizedBox(height: AppSpacing.sm),
@@ -112,9 +119,26 @@ class _ContinueAsScreenState extends State<ContinueAsScreen>
 
               _stagger(0.28, const _Headline()),
               const Spacer(flex: 3),
-              _stagger(0.42, _PrimaryAction(onTap: _member)),
+              _stagger(
+                  0.42,
+                  _PrimaryAction(
+                    onTap: member == null ? _member : _toTable,
+                    label: member == null
+                        ? 'Log in as a member'
+                        : 'Continue as ${member.name}',
+                  )),
               const SizedBox(height: AppSpacing.md),
-              _stagger(0.52, _GuestAction(onTap: _guest)),
+              _stagger(
+                  0.52,
+                  member == null
+                      ? _GuestAction(onTap: _guest)
+                      : SizedBox(
+                          height: AppSpacing.buttonHeight,
+                          child: TextButton(
+                            onPressed: () => state.signOut(),
+                            child: const Text('Not you? Log out'),
+                          ),
+                        )),
               const SizedBox(height: AppSpacing.lg),
               _stagger(0.62, const _FinePrint(), rise: 10),
               const SizedBox(height: AppSpacing.sm),
@@ -142,8 +166,8 @@ class _BrandRow extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('Robomos',
-                style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w700, height: 1.1)),
+                style: AppTypography.body
+                    .copyWith(fontWeight: FontWeight.w700, height: 1.1)),
             Text('Poke · Melbourne',
                 style: AppTypography.label
                     .copyWith(color: AppColors.textSecondary)),
@@ -333,8 +357,8 @@ class _Headline extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Your bowl,',
-            style: AppTypography.screenTitle
-                .copyWith(fontSize: 34, height: 1.08)),
+            style:
+                AppTypography.screenTitle.copyWith(fontSize: 34, height: 1.08)),
         Text('built your way.',
             style: AppTypography.screenTitle.copyWith(
               fontSize: 34,
@@ -361,9 +385,10 @@ class _Headline extends StatelessWidget {
 // ---------------------------------------------------------------- actions
 
 class _PrimaryAction extends StatelessWidget {
-  const _PrimaryAction({required this.onTap});
+  const _PrimaryAction({required this.onTap, required this.label});
 
   final VoidCallback onTap;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -374,7 +399,7 @@ class _PrimaryAction extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('Log in as a member'),
+            Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
             const SizedBox(width: AppSpacing.sm),
             Icon(Icons.arrow_forward, size: 18, color: AppColors.onPrimary),
           ],
@@ -417,11 +442,11 @@ class _FinePrint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      'Guest orders are not saved. You can create an account later\n'
-      'and keep what you have already ordered.',
+      'Guest orders are kept on this device only. Create an account\n'
+      'later and your current order moves across with you.',
       textAlign: TextAlign.center,
-      style: AppTypography.label.copyWith(
-          color: AppColors.textSecondary, height: 1.45),
+      style: AppTypography.label
+          .copyWith(color: AppColors.textSecondary, height: 1.45),
     );
   }
 }

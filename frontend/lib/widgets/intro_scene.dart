@@ -144,8 +144,8 @@ class _IntroPainter extends CustomPainter {
     c.drawArc(dome, math.pi, math.pi, true, Paint()..shader = shader);
 
     // Body.
-    final body = RRect.fromLTRBR(
-        left, top, right, bottom, const Radius.circular(9));
+    final body =
+        RRect.fromLTRBR(left, top, right, bottom, const Radius.circular(9));
     c.drawRRect(body, Paint()..shader = shader);
 
     final span = bottom - top;
@@ -243,8 +243,8 @@ class _IntroPainter extends CustomPainter {
     c.restore();
 
     // Rim and contents.
-    final rim = Rect.fromCenter(
-        center: Offset(cx, cy), width: rx * 2, height: ry * 2);
+    final rim =
+        Rect.fromCenter(center: Offset(cx, cy), width: rx * 2, height: ry * 2);
     c.drawOval(
       rim,
       Paint()..color = dark ? const Color(0xFF2A241E) : const Color(0xFF3B2F27),

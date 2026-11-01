@@ -54,7 +54,8 @@ class _LanguageScreenState extends State<LanguageScreen> {
                     _LanguageRow(
                       language: language,
                       selected: language == settings.language,
-                      onTap: () => setState(() => settings.setLanguage(language)),
+                      onTap: () =>
+                          setState(() => settings.setLanguage(language)),
                     ),
                 ],
               ),
@@ -109,8 +110,7 @@ class _LanguageRow extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(language.nativeName,
-                          style: AppTypography.cardTitle),
+                      Text(language.nativeName, style: AppTypography.cardTitle),
                       const SizedBox(height: AppSpacing.xs),
                       Text(language.englishName,
                           style: AppTypography.secondary),
@@ -125,8 +125,8 @@ class _LanguageRow extends StatelessWidget {
                     height: 26,
                     decoration: BoxDecoration(
                         color: AppColors.primary, shape: BoxShape.circle),
-                    child: Icon(Icons.check,
-                        size: 16, color: AppColors.onPrimary),
+                    child:
+                        Icon(Icons.check, size: 16, color: AppColors.onPrimary),
                   ),
                 ),
               ],

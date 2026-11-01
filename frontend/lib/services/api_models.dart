@@ -11,18 +11,10 @@ String formatCents(int cents, {String currency = 'AUD'}) {
 }
 
 /// The API reports energy in calories. Australian menu labelling uses
-/// kilojoules, and so does section 7.1.6 of the report. One nutritional
-/// calorie is 4.184 kJ.
-///
-/// Converting here rather than asking the backend for a second field keeps
-/// the change on our side of the wire, which is what KAN-7 settled on.
+/// kilojoules. One nutritional calorie is 4.184 kJ.
 int caloriesToKilojoules(int calories) => (calories * 4.184).round();
 
-// Formatting stays in widgets/dish_card.dart, where formatKilojoules()
-// already lives. Converting here and formatting there keeps one formatter
-// for the whole app: formatKilojoules(caloriesToKilojoules(item.calories)).
-
-enum UserRole { customer, staff, admin }
+enum AccountRole { customer, staff, admin }
 
 enum OrderType {
   dineIn('dine_in', 'Dine-in'),
@@ -96,7 +88,7 @@ class ApiUser {
   final String id;
   final String email;
   final String fullName;
-  final UserRole role;
+  final AccountRole role;
   final String? phone;
   final bool emailVerified;
   final List<String> dietaryPreferences;
@@ -106,7 +98,7 @@ class ApiUser {
   final int lifetimePoints;
   final String loyaltyTier;
 
-  bool get isStaff => role == UserRole.staff || role == UserRole.admin;
+  bool get isStaff => role == AccountRole.staff || role == AccountRole.admin;
 
   String get initial => fullName.isEmpty ? '?' : fullName[0].toUpperCase();
 
@@ -114,8 +106,8 @@ class ApiUser {
         id: j['id'] as String,
         email: j['email'] as String,
         fullName: j['full_name'] as String? ?? '',
-        role: UserRole.values.firstWhere((r) => r.name == j['role'],
-            orElse: () => UserRole.customer),
+        role: AccountRole.values.firstWhere((r) => r.name == j['role'],
+            orElse: () => AccountRole.customer),
         phone: j['phone'] as String?,
         emailVerified: j['email_verified'] as bool? ?? false,
         dietaryPreferences: _strings(j['dietary_preferences']),
@@ -128,16 +120,25 @@ class ApiUser {
 }
 
 class AuthResult {
-  AuthResult({this.accessToken, this.refreshToken, required this.user});
+  AuthResult(
+      {this.accessToken, this.refreshToken, required this.user, this.message});
 
   final String? accessToken;
   final String? refreshToken;
   final ApiUser user;
 
+  /// Set on register, for example when the email has to be verified first.
+  final String? message;
+
+  /// False when the server created the account but wants the email verified
+  /// before the first login, so no tokens came back.
+  bool get isSignedIn => accessToken != null;
+
   factory AuthResult.fromJson(Map<String, dynamic> j) => AuthResult(
         accessToken: j['access_token'] as String?,
         refreshToken: j['refresh_token'] as String?,
         user: ApiUser.fromJson(j['user'] as Map<String, dynamic>),
+        message: j['message'] as String?,
       );
 }
 
@@ -450,8 +451,7 @@ class CartLine {
   /// block checkout until the customer removes or edits the line.
   final String? error;
 
-  String get summary =>
-      selections.map((s) => s.name).join(' \u00b7 ');
+  String get summary => selections.map((s) => s.name).join(' \u00b7 ');
 
   factory CartLine.fromJson(Map<String, dynamic> j) => CartLine(
         lineId: j['line_id'] as String,
@@ -706,6 +706,7 @@ class SavedRecipe {
     this.calories,
     this.unavailableReason,
     this.timesOrdered = 0,
+    this.specialInstructions,
   });
 
   final String id;
@@ -718,6 +719,7 @@ class SavedRecipe {
   final int? calories;
   final String? unavailableReason;
   final int timesOrdered;
+  final String? specialInstructions;
 
   factory SavedRecipe.fromJson(Map<String, dynamic> j) => SavedRecipe(
         id: j['id'] as String,
@@ -732,6 +734,7 @@ class SavedRecipe {
         calories: j['calories'] as int?,
         unavailableReason: j['unavailable_reason'] as String?,
         timesOrdered: j['times_ordered'] as int? ?? 0,
+        specialInstructions: j['special_instructions'] as String?,
       );
 }
 

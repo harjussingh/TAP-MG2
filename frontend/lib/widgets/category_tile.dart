@@ -34,7 +34,8 @@ class CategoryTileBar extends StatelessWidget {
     SettingsScope.watch(context);
 
     return SizedBox(
-      height: 88,
+      // Grows with the chosen text size so the label never clips.
+      height: 88 * settings.textScale.factor,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding:
@@ -88,23 +89,28 @@ class _Tile extends StatelessWidget {
               color: isSelected ? AppColors.primary : AppColors.border,
             ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(glyph, style: const TextStyle(fontSize: 24)),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.label.copyWith(
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  // Dark on saffron, never white: the contrast rule holds
-                  // because onPrimary comes from the chosen accent.
-                  color: isSelected ? AppColors.onPrimary : AppColors.base,
+          // scaleDown: a tile that is still short of room shrinks a touch
+          // rather than clipping its label.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(glyph, style: const TextStyle(fontSize: 24)),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.label.copyWith(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    // Dark on saffron, never white: the contrast rule holds
+                    // because onPrimary comes from the chosen accent.
+                    color: isSelected ? AppColors.onPrimary : AppColors.base,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

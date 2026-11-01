@@ -42,9 +42,33 @@ class _ReviewScreenState extends State<ReviewScreen> {
     super.dispose();
   }
 
-  void _submit() {
-    AppScope.of(context).rateOrder(widget.order, _rating);
-    setState(() => _submitted = true);
+  /// The words sent to the API for each chip.
+  static String _tagKey(String label) => label.split(' ').first.toLowerCase();
+
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _submit() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await AppScope.read(context).submitReview(
+        widget.order,
+        rating: _rating,
+        comment: _comment.text.trim(),
+        tags: _chosen.map(_tagKey).toList(),
+      );
+      if (mounted) setState(() => _submitted = true);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = errorMessage(e);
+        });
+      }
+    }
   }
 
   @override
@@ -91,7 +115,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('ORDER #${widget.order.id}',
+            Text('ORDER ${widget.order.number}',
                 style: AppTypography.label.copyWith(
                     color: AppColors.textSecondary, letterSpacing: 1.2)),
             const Text('How was your poke? \u{1F963}'),
@@ -117,8 +141,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         onPressed: () => setState(() => _rating = i),
                         icon: Icon(
                           i <= _rating ? Icons.star : Icons.star_border,
-                          color:
-                              i <= _rating ? AppColors.primary : AppColors.border,
+                          color: i <= _rating
+                              ? AppColors.primary
+                              : AppColors.border,
                         ),
                       ),
                   ],
@@ -164,11 +189,18 @@ class _ReviewScreenState extends State<ReviewScreen> {
               ],
             ),
           ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Text(_error!,
+                  style:
+                      AppTypography.secondary.copyWith(color: AppColors.error)),
+            ),
           const SizedBox(height: AppSpacing.sm),
           // Disabled until a rating is given, since a review without one
           // carries no information.
           ElevatedButton(
-            onPressed: _rating == 0 ? null : _submit,
+            onPressed: _rating == 0 || _busy ? null : _submit,
             child: const Text('Submit review'),
           ),
           TextButton(
@@ -204,7 +236,8 @@ class _Panel extends StatelessWidget {
         children: [
           if (label != null) ...[
             Text(label!,
-                style: AppTypography.body.copyWith(fontWeight: FontWeight.w600)),
+                style:
+                    AppTypography.body.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: AppSpacing.md),
           ],
           child,

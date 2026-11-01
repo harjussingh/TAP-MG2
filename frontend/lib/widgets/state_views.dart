@@ -40,14 +40,17 @@ class EmptyStateView extends StatelessWidget {
               child: Icon(icon, size: 32, color: AppColors.textSecondary),
             ),
             const SizedBox(height: AppSpacing.lg),
-            Text(title, style: AppTypography.cardTitle, textAlign: TextAlign.center),
+            Text(title,
+                style: AppTypography.cardTitle, textAlign: TextAlign.center),
             const SizedBox(height: AppSpacing.sm),
-            Text(message, style: AppTypography.secondary, textAlign: TextAlign.center),
+            Text(message,
+                style: AppTypography.secondary, textAlign: TextAlign.center),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: AppSpacing.xl),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(onPressed: onAction, child: Text(actionLabel!)),
+                child: ElevatedButton(
+                    onPressed: onAction, child: Text(actionLabel!)),
               ),
             ],
           ],
@@ -81,13 +84,16 @@ class ErrorStateView extends StatelessWidget {
           children: [
             const Icon(Icons.wifi_off, size: 40, color: AppColors.error),
             const SizedBox(height: AppSpacing.lg),
-            Text(title, style: AppTypography.cardTitle, textAlign: TextAlign.center),
+            Text(title,
+                style: AppTypography.cardTitle, textAlign: TextAlign.center),
             const SizedBox(height: AppSpacing.sm),
-            Text(message, style: AppTypography.secondary, textAlign: TextAlign.center),
+            Text(message,
+                style: AppTypography.secondary, textAlign: TextAlign.center),
             const SizedBox(height: AppSpacing.xl),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(onPressed: onRetry, child: const Text('Try again')),
+              child: ElevatedButton(
+                  onPressed: onRetry, child: const Text('Try again')),
             ),
           ],
         ),
@@ -150,7 +156,9 @@ class _DishCardSkeletonState extends State<DishCardSkeleton>
               ),
             ),
             SizedBox(width: AppSpacing.md),
-            _Bar(width: AppSpacing.thumbnailSize, height: AppSpacing.thumbnailSize),
+            _Bar(
+                width: AppSpacing.thumbnailSize,
+                height: AppSpacing.thumbnailSize),
           ],
         ),
       ),

@@ -97,7 +97,8 @@ class _Tags extends StatelessWidget {
         const _TagPill(label: 'Out of stock', colour: AppColors.error),
     ];
     if (chips.isEmpty) return const SizedBox.shrink();
-    return Wrap(spacing: AppSpacing.sm, runSpacing: AppSpacing.xs, children: chips);
+    return Wrap(
+        spacing: AppSpacing.sm, runSpacing: AppSpacing.xs, children: chips);
   }
 }
 

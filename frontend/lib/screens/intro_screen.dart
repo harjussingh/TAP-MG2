@@ -56,7 +56,8 @@ class _IntroScreenState extends State<IntroScreen>
   Widget _stagger(double begin, Widget child, {double rise = 20}) {
     final curve = CurvedAnimation(
       parent: _enter,
-      curve: Interval(begin, math.min(1, begin + 0.55), curve: Curves.easeOutCubic),
+      curve: Interval(begin, math.min(1, begin + 0.55),
+          curve: Curves.easeOutCubic),
     );
     return AnimatedBuilder(
       animation: curve,
@@ -241,8 +242,7 @@ Path _archPath(Size s, double bottomRadius) {
   final path = Path()
     ..moveTo(0, h - br)
     ..lineTo(0, r)
-    ..arcToPoint(Offset(w, r),
-        radius: Radius.circular(r), clockwise: true)
+    ..arcToPoint(Offset(w, r), radius: Radius.circular(r), clockwise: true)
     ..lineTo(w, h - br);
 
   if (br >= 1) {

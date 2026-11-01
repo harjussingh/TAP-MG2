@@ -48,7 +48,8 @@ class _ScenePainter extends CustomPainter {
   Color get _skyTop => dark ? const Color(0xFF16222F) : const Color(0xFFAFDCF2);
   Color get _skyBottom =>
       dark ? const Color(0xFF243647) : const Color(0xFFE4F3FB);
-  Color get _hillFar => dark ? const Color(0xFF24404A) : const Color(0xFFBCE3C3);
+  Color get _hillFar =>
+      dark ? const Color(0xFF24404A) : const Color(0xFFBCE3C3);
   Color get _hillNear =>
       dark ? const Color(0xFF1C3A3C) : const Color(0xFF93D3A4);
   Color get _ground => dark ? const Color(0xFF16302F) : const Color(0xFF6FC088);
@@ -123,7 +124,8 @@ class _ScenePainter extends CustomPainter {
     final paint = Paint()..color = _cloud;
 
     canvas.drawCircle(Offset(x, cy), unit, paint);
-    canvas.drawCircle(Offset(x + unit * 1.0, cy - unit * 0.42), unit * 0.82, paint);
+    canvas.drawCircle(
+        Offset(x + unit * 1.0, cy - unit * 0.42), unit * 0.82, paint);
     canvas.drawCircle(Offset(x + unit * 2.0, cy), unit * 0.70, paint);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -167,8 +169,8 @@ class _ScenePainter extends CustomPainter {
 
     // Body
     final body = RRect.fromRectAndCorners(
-      Rect.fromLTWH(cx - unit * 0.46, baseY - unit * 0.80, unit * 0.92,
-          unit * 0.80),
+      Rect.fromLTWH(
+          cx - unit * 0.46, baseY - unit * 0.80, unit * 0.92, unit * 0.80),
       topLeft: Radius.circular(unit * 0.18),
       topRight: Radius.circular(unit * 0.18),
       bottomLeft: Radius.circular(unit * 0.06),
@@ -187,8 +189,8 @@ class _ScenePainter extends CustomPainter {
     // lands in the scene.
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(cx - unit * 0.34, baseY - unit * 0.70, unit * 0.68,
-            unit * 0.16),
+        Rect.fromLTWH(
+            cx - unit * 0.34, baseY - unit * 0.70, unit * 0.68, unit * 0.16),
         Radius.circular(unit * 0.06),
       ),
       Paint()..color = accent,
@@ -226,8 +228,8 @@ class _ScenePainter extends CustomPainter {
     // Nozzle
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(cx + unit * 0.44, baseY - unit * 0.62, unit * 0.30,
-            unit * 0.07),
+        Rect.fromLTWH(
+            cx + unit * 0.44, baseY - unit * 0.62, unit * 0.30, unit * 0.07),
         Radius.circular(unit * 0.035),
       ),
       Paint()..color = _metalDark,
@@ -281,8 +283,8 @@ class _ScenePainter extends CustomPainter {
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(dropX - unit * 0.27, baseY - unit * 0.17, unit * 0.54,
-            unit * 0.05),
+        Rect.fromLTWH(
+            dropX - unit * 0.27, baseY - unit * 0.17, unit * 0.54, unit * 0.05),
         Radius.circular(unit * 0.025),
       ),
       Paint()..color = _metalDark,

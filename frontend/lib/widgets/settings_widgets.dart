@@ -33,8 +33,8 @@ class _DarkModeCardState extends State<DarkModeCard> {
           decoration: BoxDecoration(
             color: AppColors.card,
             borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-            border: Border.all(
-                color: on ? AppColors.primary : AppColors.border),
+            border:
+                Border.all(color: on ? AppColors.primary : AppColors.border),
           ),
           child: Row(
             children: [
@@ -84,9 +84,8 @@ class _SunMoon extends StatelessWidget {
       height: 34,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: on
-            ? AppColors.primary.withValues(alpha: 0.22)
-            : AppColors.border,
+        color:
+            on ? AppColors.primary.withValues(alpha: 0.22) : AppColors.border,
         borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
       ),
       child: AnimatedAlign(
@@ -133,8 +132,7 @@ class SettingsSectionLabel extends StatelessWidget {
                   color: AppColors.textSecondary, letterSpacing: 1.2)),
           if (trailing != null)
             Text(trailing!,
-                style: AppTypography.label
-                    .copyWith(color: AppColors.primary)),
+                style: AppTypography.label.copyWith(color: AppColors.primary)),
         ],
       ),
     );
@@ -306,8 +304,7 @@ class _ChangeBarState extends State<ChangeBar> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(S.t('reviewChanges'),
-                  style: AppTypography.sectionHeading),
+              Text(S.t('reviewChanges'), style: AppTypography.sectionHeading),
               const SizedBox(height: AppSpacing.lg),
               if (summary.isEmpty)
                 Text(S.t('noChanges'), style: AppTypography.secondary)
@@ -320,9 +317,7 @@ class _ChangeBarState extends State<ChangeBar> {
                         Icon(Icons.check_circle,
                             size: 18, color: AppColors.primary),
                         const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                            child:
-                                Text(line, style: AppTypography.body)),
+                        Expanded(child: Text(line, style: AppTypography.body)),
                       ],
                     ),
                   ),
@@ -390,8 +385,8 @@ class _ChangeBarState extends State<ChangeBar> {
                     onPressed: _review,
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(0, AppSpacing.minTouchTarget),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xl),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
                     ),
                     child: Text(S.t('review')),
                   ),

@@ -1,71 +1,63 @@
-enum OrderType {
-  dineIn('Dine-in'),
-  takeaway('Takeaway'),
-  delivery('Delivery');
+// Orders, carts and their parts come straight from the API. Re-exported here
+// so screens keep importing one models file.
+export '../services/api_models.dart'
+    show
+        Cart,
+        CartLine,
+        CheckoutResult,
+        Order,
+        OrderStatus,
+        OrderType,
+        PaymentMethod,
+        PricedSelection,
+        StatusEvent,
+        TableRef,
+        Totals,
+        caloriesToKilojoules,
+        formatCents;
 
-  const OrderType(this.label);
-  final String label;
-}
+import '../services/api_models.dart';
 
+/// Who is using the app. Separate from the account role on the server: a
+/// guest has no account at all.
 enum UserRole { guest, member }
 
-enum OrderStage {
-  received('Order received', 'Your order is in the queue'),
-  preparing('Preparing', 'Machine 2 is building your bowl'),
-  ready('Ready for collection', 'Collect from Bay 3'),
-  completed('Completed', 'Enjoy your meal!');
+/// The four steps on the tracking screen.
+const List<OrderStatus> kTrackerSteps = [
+  OrderStatus.confirmed,
+  OrderStatus.preparing,
+  OrderStatus.ready,
+  OrderStatus.completed,
+];
 
-  const OrderStage(this.title, this.detail);
-  final String title;
-  final String detail;
+extension OrderStatusDisplay on OrderStatus {
+  String get title => switch (this) {
+        OrderStatus.pendingPayment => 'Waiting for payment',
+        OrderStatus.confirmed => 'Order received',
+        OrderStatus.preparing => 'Preparing',
+        OrderStatus.ready => 'Ready for collection',
+        OrderStatus.completed => 'Completed',
+        OrderStatus.cancelled => 'Cancelled',
+      };
+
+  String get detail => switch (this) {
+        OrderStatus.pendingPayment => 'Finish paying to send it to the kitchen',
+        OrderStatus.confirmed => 'Your order is in the queue',
+        OrderStatus.preparing => 'The machine is building your bowl',
+        OrderStatus.ready => 'Collect it from the counter',
+        OrderStatus.completed => 'Enjoy your meal!',
+        OrderStatus.cancelled => 'This order was cancelled',
+      };
 }
 
-/// One line in the cart. Built from either a listed dish or a custom bowl.
-class CartLine {
-  const CartLine({
-    required this.title,
-    required this.subtitle,
-    required this.emoji,
-    required this.price,
-    required this.kilojoules,
-    this.isCustom = false,
-  });
+extension OrderDisplay on Order {
+  String get number => '#$orderNumber';
 
-  final String title;
-  final String subtitle;
-  final String emoji;
-  final double price;
-  final int kilojoules;
-  final bool isCustom;
+  /// "Dine-in · Table 07" or "Takeaway".
+  String get placeLabel => orderType == OrderType.dineIn && table != null
+      ? '${orderType.label} · Table ${tableLabel(table!.number)}'
+      : orderType.label;
 }
 
-class Order {
-  Order({
-    required this.id,
-    required this.lines,
-    required this.type,
-    required this.tableNumber,
-    required this.total,
-    required this.placedAt,
-    this.stage = OrderStage.received,
-    this.rating,
-  });
-
-  final String id;
-  final List<CartLine> lines;
-  final OrderType type;
-  final String tableNumber;
-  final double total;
-  final DateTime placedAt;
-
-  OrderStage stage;
-  int? rating;
-
-  /// Australian prices are GST inclusive, so GST is one eleventh of the total.
-  double get gst => total / 11;
-
-  int get etaSeconds => 5 * 60;
-
-  String get collectionBay => 'Bay 3';
-  String get machine => 'No. 2';
-}
+/// Table numbers are shown with two digits, the way they are printed.
+String tableLabel(int number) => number.toString().padLeft(2, '0');

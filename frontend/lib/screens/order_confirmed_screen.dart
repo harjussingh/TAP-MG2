@@ -5,7 +5,6 @@ import '../theme/app_colors.dart';
 import '../theme/app_settings.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
-import '../widgets/dish_card.dart';
 import 'order_tracking_screen.dart';
 
 /// No QR code here. The order number identifies the order, and the items are
@@ -41,8 +40,12 @@ class OrderConfirmedScreen extends StatelessWidget {
             Text('Order placed!',
                 textAlign: TextAlign.center, style: AppTypography.screenTitle),
             const SizedBox(height: AppSpacing.xs),
-            Text('Your bowl is in the queue.',
-                textAlign: TextAlign.center, style: AppTypography.body),
+            Text(
+                order.status == OrderStatus.pendingPayment
+                    ? 'Waiting for your payment to go through.'
+                    : 'Your bowl is in the queue.',
+                textAlign: TextAlign.center,
+                style: AppTypography.body),
             const SizedBox(height: AppSpacing.xl),
             Container(
               padding: const EdgeInsets.all(AppSpacing.lg),
@@ -59,8 +62,9 @@ class OrderConfirmedScreen extends StatelessWidget {
                     children: [
                       Text('ORDER',
                           style: AppTypography.label.copyWith(
-                              color: AppColors.textSecondary, letterSpacing: 1.2)),
-                      Text('#${order.id}',
+                              color: AppColors.textSecondary,
+                              letterSpacing: 1.2)),
+                      Text(order.number,
                           style: AppTypography.sectionHeading
                               .copyWith(color: Colors.white)),
                     ],
@@ -70,8 +74,9 @@ class OrderConfirmedScreen extends StatelessWidget {
                     children: [
                       Text('READY IN',
                           style: AppTypography.label.copyWith(
-                              color: AppColors.textSecondary, letterSpacing: 1.2)),
-                      Text('~5 min',
+                              color: AppColors.textSecondary,
+                              letterSpacing: 1.2)),
+                      Text(_eta(order),
                           style: AppTypography.sectionHeading
                               .copyWith(color: AppColors.success)),
                     ],
@@ -84,7 +89,7 @@ class OrderConfirmedScreen extends StatelessWidget {
               label: 'ITEMS ORDERED',
               child: Column(
                 children: [
-                  for (final line in order.lines)
+                  for (final line in order.items)
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: Row(
@@ -94,15 +99,19 @@ class OrderConfirmedScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(line.title,
-                                    style: AppTypography.body.copyWith(
-                                        fontWeight: FontWeight.w600)),
-                                Text(line.subtitle,
-                                    style: AppTypography.secondary),
+                                Text(
+                                    line.quantity > 1
+                                        ? '${line.quantity} \u00d7 ${line.name}'
+                                        : line.name,
+                                    style: AppTypography.body
+                                        .copyWith(fontWeight: FontWeight.w600)),
+                                if (line.summary.isNotEmpty)
+                                  Text(line.summary,
+                                      style: AppTypography.secondary),
                               ],
                             ),
                           ),
-                          Text(formatPrice(line.price),
+                          Text(formatCents(line.lineTotalCents),
                               style: AppTypography.body
                                   .copyWith(fontWeight: FontWeight.w600)),
                         ],
@@ -114,16 +123,32 @@ class OrderConfirmedScreen extends StatelessWidget {
             _Panel(
               child: Column(
                 children: [
-                  _Row(label: 'Subtotal', value: formatPrice(order.total)),
+                  _Row(
+                      label: 'Subtotal',
+                      value: formatCents(order.pricing.subtotalCents)),
+                  if (order.pricing.discountCents > 0) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    _Row(
+                        label: 'Points discount',
+                        value: '-${formatCents(order.pricing.discountCents)}',
+                        muted: true),
+                  ],
                   const SizedBox(height: AppSpacing.xs),
                   _Row(
-                      label: 'GST included',
-                      value: formatPrice(order.gst),
+                      label: 'GST',
+                      value: formatCents(order.pricing.taxCents),
                       muted: true),
+                  if (order.pricing.serviceFeeCents > 0) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    _Row(
+                        label: 'Service fee',
+                        value: formatCents(order.pricing.serviceFeeCents),
+                        muted: true),
+                  ],
                   const Divider(height: AppSpacing.xl),
                   _Row(
                       label: 'Total',
-                      value: formatPrice(order.total),
+                      value: formatCents(order.pricing.totalCents),
                       bold: true),
                 ],
               ),
@@ -138,14 +163,12 @@ class OrderConfirmedScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          order.type == OrderType.dineIn
-                              ? '${order.type.label} \u00b7 Table ${order.tableNumber}'
-                              : order.type.label,
+                          order.placeLabel,
                           style: AppTypography.body
                               .copyWith(fontWeight: FontWeight.w600),
                         ),
                         Text(
-                          order.type == OrderType.dineIn
+                          order.orderType == OrderType.dineIn
                               ? 'Your bowl will be brought to your table'
                               : 'Collect from the counter when ready',
                           style: AppTypography.secondary,
@@ -165,8 +188,8 @@ class OrderConfirmedScreen extends StatelessWidget {
               child: const Text('Track my order \u2192'),
             ),
             TextButton(
-              onPressed: () => Navigator.of(context)
-                  .popUntil((route) => route.isFirst),
+              onPressed: () =>
+                  Navigator.of(context).popUntil((route) => route.isFirst),
               child: const Text('Back to menu'),
             ),
           ],
@@ -174,6 +197,14 @@ class OrderConfirmedScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "~6 min", or a dash until the kitchen has worked out a time.
+String _eta(Order order) {
+  final left = order.timeRemaining;
+  if (left == null) return '\u2014';
+  final minutes = (left.inSeconds / 60).ceil();
+  return minutes <= 0 ? 'Now' : '~$minutes min';
 }
 
 class _Panel extends StatelessWidget {

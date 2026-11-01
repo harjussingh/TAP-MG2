@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../models/dish.dart';
 import '../models/order.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_settings.dart';
@@ -13,9 +14,10 @@ import 'checkout_screen.dart';
 
 /// The order before it is sent.
 ///
-/// Identical bowls are grouped into one row with a quantity, which is how
-/// people think about an order: "two tuna bowls", not "a tuna bowl and another
-/// tuna bowl".
+/// The cart lives on the server. Each row is one server line with its own
+/// quantity, which is how people think about an order: "two tuna bowls", not
+/// "a tuna bowl and another tuna bowl". Every change returns the whole cart
+/// with freshly calculated prices, and that is what is shown.
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
@@ -25,16 +27,37 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   final TextEditingController _table = TextEditingController();
-  bool _seeded = false;
+  bool _loading = true;
+  bool _busy = false;
+  String? _loadError;
 
-  /// Reading AppScope needs an inherited widget lookup, which must not happen
-  /// part-way through build. didChangeDependencies is the right place.
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_seeded) return;
-    _seeded = true;
-    _table.text = AppScope.of(context).tableNumber;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    final state = AppScope.read(context);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      await state.refreshCart();
+      _table.text = state.tableNumber;
+      if (state.isMember) {
+        try {
+          await state.loadLoyalty();
+        } catch (_) {
+          // The points card simply stays hidden.
+        }
+      }
+    } catch (e) {
+      _loadError = errorMessage(e);
+    }
+    if (mounted) setState(() => _loading = false);
   }
 
   @override
@@ -43,55 +66,98 @@ class _CartScreenState extends State<CartScreen> {
     super.dispose();
   }
 
-  /// Groups the flat cart into rows of identical lines.
-  List<_Group> _groups(AppState state) {
-    final groups = <String, _Group>{};
-    for (final line in state.cart) {
-      final key = '${line.title}|${line.subtitle}';
-      groups.putIfAbsent(key, () => _Group(line: line, count: 0)).count++;
+  /// Runs one cart change, keeping the screen responsive and showing the
+  /// server's message if it is refused.
+  Future<void> _change(Future<void> Function() action) async {
+    setState(() => _busy = true);
+    try {
+      await action();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(errorMessage(e))));
+      }
     }
-    return groups.values.toList();
+    if (mounted) setState(() => _busy = false);
   }
 
-  void _setQuantity(AppState state, _Group group, int next) {
-    setState(() {
-      if (next > group.count) {
-        state.addToCart(group.line);
+  Future<void> _checkout(AppState state) async {
+    // A changed table number is checked by the server before moving on.
+    if (state.orderType == OrderType.dineIn) {
+      final typed = int.tryParse(_table.text.trim());
+      if (typed == null || typed < 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter your table number first')),
+        );
         return;
       }
-      for (var i = state.cart.length - 1; i >= 0; i--) {
-        final line = state.cart[i];
-        if (line.title == group.line.title &&
-            line.subtitle == group.line.subtitle) {
-          state.removeFromCart(i);
-          return;
-        }
+      if (state.cart?.table?.number != typed) {
+        var ok = false;
+        await _change(() async {
+          await state.chooseTable(typed);
+          ok = true;
+        });
+        if (!ok || !mounted) return;
+        _table.text = state.tableNumber;
       }
-    });
-  }
-
-  void _removeAll(AppState state, _Group group) {
-    setState(() {
-      for (var i = state.cart.length - 1; i >= 0; i--) {
-        final line = state.cart[i];
-        if (line.title == group.line.title &&
-            line.subtitle == group.line.subtitle) {
-          state.removeFromCart(i);
-        }
-      }
-    });
+    }
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const CheckoutScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
     final state = AppScope.of(context);
-    final groups = _groups(state);
+    final cart = state.cart;
+    final lines = state.cartLines;
 
     final subtitle =
         state.orderType == OrderType.dineIn && state.tableNumber.isNotEmpty
             ? '${state.orderType.label} · Table ${state.tableNumber}'
             : state.orderType.label;
+
+    Widget body;
+    if (_loading && cart == null) {
+      body = const Center(child: CircularProgressIndicator());
+    } else if (_loadError != null && cart == null) {
+      body = ErrorStateView(
+        title: "We couldn't load your order",
+        message: _loadError!,
+        onRetry: _load,
+      );
+    } else if (lines.isEmpty) {
+      body = EmptyStateView(
+        icon: Icons.shopping_bag_outlined,
+        title: 'Nothing here yet',
+        message: 'Add a bowl and it will show up here.',
+        actionLabel: 'Browse the menu',
+        onAction: () => Navigator.pop(context),
+      );
+    } else {
+      body = ListView(
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        children: [
+          for (final line in lines)
+            _LineCard(
+              line: line,
+              enabled: !_busy,
+              onQuantity: (v) =>
+                  _change(() => state.setLineQuantity(line.lineId, v)),
+              onRemove: () => _change(() => state.removeLine(line.lineId)),
+            ),
+          const SizedBox(height: AppSpacing.sm),
+          if (state.orderType == OrderType.dineIn) _tableCard(),
+          // Loyalty points are a member benefit, so a guest never sees the
+          // card. The server enforces this too.
+          if (state.isMember && state.loyalty != null) _loyaltyCard(state),
+          _totalsCard(cart!.totals),
+          const SizedBox(height: AppSpacing.xxxl),
+        ],
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -101,39 +167,14 @@ class _CartScreenState extends State<CartScreen> {
           children: [
             const Text('Your order'),
             Text(subtitle,
-                style: AppTypography.secondary
-                    .copyWith(color: AppColors.onHeader.withValues(alpha: 0.7))),
+                style: AppTypography.secondary.copyWith(
+                    color: AppColors.onHeader.withValues(alpha: 0.7))),
           ],
         ),
       ),
-      body: state.cart.isEmpty
-          ? EmptyStateView(
-              icon: Icons.shopping_bag_outlined,
-              title: 'Nothing here yet',
-              message: 'Add a bowl and it will show up here.',
-              actionLabel: 'Browse the menu',
-              onAction: () => Navigator.pop(context),
-            )
-          : ListView(
-              padding: const EdgeInsets.all(AppSpacing.screenPadding),
-              children: [
-                for (final group in groups)
-                  _LineCard(
-                    group: group,
-                    onQuantity: (v) => _setQuantity(state, group, v),
-                    onRemove: () => _removeAll(state, group),
-                  ),
-                const SizedBox(height: AppSpacing.sm),
-                if (state.orderType == OrderType.dineIn) _tableCard(),
-                // Loyalty points are a member benefit, so a guest never sees
-                // the field. The server enforces this too.
-                if (state.isMember) _loyaltyCard(),
-                _totalsCard(state),
-                const SizedBox(height: AppSpacing.xxxl),
-              ],
-            ),
+      body: body,
       bottomNavigationBar:
-          state.cart.isEmpty ? null : _checkoutBar(context, state),
+          lines.isEmpty || cart == null ? null : _checkoutBar(state, cart),
     );
   }
 
@@ -148,60 +189,85 @@ class _CartScreenState extends State<CartScreen> {
       );
 
   /// The API has no coupons: members earn and redeem loyalty points instead.
-  /// See INTEGRATION_CHECK.md 3.7.
-  Widget _loyaltyCard() => _Panel(
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.stars_rounded, color: AppColors.primary),
+  Widget _loyaltyCard(AppState state) {
+    final loyalty = state.loyalty!;
+    final canRedeem = loyalty.points >= loyalty.minPointsToRedeem;
+    return _Panel(
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
             ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Loyalty points',
-                      style: AppTypography.body
-                          .copyWith(fontWeight: FontWeight.w600)),
-                  Text('Redeem at checkout, from 100 points',
-                      style: AppTypography.secondary),
-                ],
-              ),
+            child: Icon(Icons.stars_rounded, color: AppColors.primary),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${loyalty.points} loyalty points',
+                    style: AppTypography.body
+                        .copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                    canRedeem
+                        ? 'Use them at checkout, worth up to '
+                            '${formatCents(loyalty.redeemableValueCents)}'
+                        : 'Redeem at checkout from '
+                            '${loyalty.minPointsToRedeem} points',
+                    style: AppTypography.secondary),
+              ],
             ),
-            Icon(Icons.chevron_right, color: AppColors.textSecondary),
-          ],
-        ),
-      );
+          ),
+        ],
+      ),
+    );
+  }
 
-  Widget _totalsCard(AppState state) {
-    final gst = state.cartTotal / 11;
+  Widget _totalsCard(Totals totals) {
+    final taxPercent = (totals.taxRate * 100)
+        .toStringAsFixed(totals.taxRate * 100 % 1 == 0 ? 0 : 1);
     return _Panel(
       child: Column(
         children: [
-          _Row(label: 'Subtotal', value: formatPrice(state.cartTotal)),
+          _Row(label: 'Subtotal', value: formatCents(totals.subtotalCents)),
+          if (totals.discountCents > 0) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _Row(
+                label: 'Points discount',
+                value: '-${formatCents(totals.discountCents)}',
+                muted: true),
+          ],
           const SizedBox(height: AppSpacing.sm),
-          _Row(label: 'Includes GST', value: formatPrice(gst), muted: true),
+          _Row(
+              label: 'GST ($taxPercent%)',
+              value: formatCents(totals.taxCents),
+              muted: true),
+          if (totals.serviceFeeCents > 0) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _Row(
+                label: 'Service fee',
+                value: formatCents(totals.serviceFeeCents),
+                muted: true),
+          ],
           Padding(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
             child: Divider(height: 1, color: AppColors.border),
           ),
           _Row(
               label: 'Total',
-              value: formatPrice(state.cartTotal),
+              value: formatCents(totals.totalCents),
               bold: true),
         ],
       ),
     );
   }
 
-  Widget _checkoutBar(BuildContext context, AppState state) {
+  Widget _checkoutBar(AppState state, Cart cart) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card,
@@ -216,25 +282,24 @@ class _CartScreenState extends State<CartScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(formatPrice(state.cartTotal),
+                  Text(formatCents(cart.totals.totalCents),
                       style: AppTypography.cardTitle
                           .copyWith(fontWeight: FontWeight.w700)),
                   Text(
-                      '${state.cart.length} item'
-                      '${state.cart.length == 1 ? '' : 's'}',
-                      style: AppTypography.secondary),
+                      cart.hasErrors
+                          ? 'Fix the items marked above'
+                          : '${state.cartCount} item'
+                              '${state.cartCount == 1 ? '' : 's'}',
+                      style: AppTypography.secondary.copyWith(
+                          color: cart.hasErrors ? AppColors.error : null)),
                 ],
               ),
               const SizedBox(width: AppSpacing.lg),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {
-                    state.setTableNumber(_table.text);
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                          builder: (_) => const CheckoutScreen()),
-                    );
-                  },
+                  // Blocked while a line needs attention.
+                  onPressed:
+                      _busy || cart.hasErrors ? null : () => _checkout(state),
                   child: const Text('Checkout'),
                 ),
               ),
@@ -246,30 +311,26 @@ class _CartScreenState extends State<CartScreen> {
   }
 }
 
-class _Group {
-  _Group({required this.line, required this.count});
-
-  final CartLine line;
-  int count;
-
-  double get total => line.price * count;
-  int get kilojoules => line.kilojoules * count;
-}
-
 class _LineCard extends StatelessWidget {
   const _LineCard({
-    required this.group,
+    required this.line,
+    required this.enabled,
     required this.onQuantity,
     required this.onRemove,
   });
 
-  final _Group group;
+  final CartLine line;
+  final bool enabled;
   final ValueChanged<int> onQuantity;
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
-    final line = group.line;
+    final isCustom = line.itemType == 'custom_bowl';
+    final details = [
+      if (line.summary.isNotEmpty) line.summary,
+      if (line.specialInstructions != null) line.specialInstructions!,
+    ].join(' · ');
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.cardGap),
@@ -277,7 +338,8 @@ class _LineCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+            color: line.error == null ? AppColors.border : AppColors.error),
       ),
       child: Column(
         children: [
@@ -285,7 +347,9 @@ class _LineCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               EmojiTile(
-                  emoji: line.emoji, colour: AppColors.tileBlue, size: 56),
+                  emoji: foodEmoji(line.name),
+                  colour: AppColors.tileBlue,
+                  size: 56),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
@@ -294,18 +358,18 @@ class _LineCard extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(line.title,
+                          child: Text(line.name,
                               style: AppTypography.body
                                   .copyWith(fontWeight: FontWeight.w700)),
                         ),
-                        if (line.isCustom)
+                        if (isCustom)
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: AppSpacing.sm, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppColors.tileBlue,
-                              borderRadius: BorderRadius.circular(
-                                  AppSpacing.radiusPill),
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusPill),
                             ),
                             child: Text('Custom',
                                 style:
@@ -313,15 +377,27 @@ class _LineCard extends StatelessWidget {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(line.subtitle,
-                        style: AppTypography.secondary,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 2),
-                    Text(formatKilojoules(group.kilojoules),
-                        style: AppTypography.label
-                            .copyWith(color: AppColors.textSecondary)),
+                    if (details.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(details,
+                          style: AppTypography.secondary,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
+                    ],
+                    if (line.error != null) ...[
+                      const SizedBox(height: 2),
+                      Text(line.error!,
+                          style: AppTypography.secondary
+                              .copyWith(color: AppColors.error)),
+                    ],
+                    if (line.calories > 0) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                          formatKilojoules(caloriesToKilojoules(
+                              line.calories * line.quantity)),
+                          style: AppTypography.label
+                              .copyWith(color: AppColors.textSecondary)),
+                    ],
                   ],
                 ),
               ),
@@ -331,18 +407,19 @@ class _LineCard extends StatelessWidget {
           Row(
             children: [
               QuantityStepper(
-                value: group.count,
+                value: line.quantity,
                 compact: true,
-                onChanged: onQuantity,
+                max: 20,
+                onChanged: enabled ? onQuantity : (_) {},
               ),
               const SizedBox(width: AppSpacing.sm),
               IconButton(
-                onPressed: onRemove,
+                onPressed: enabled ? onRemove : null,
                 icon: const Icon(Icons.delete_outline, color: AppColors.error),
-                tooltip: 'Remove ${line.title}',
+                tooltip: 'Remove ${line.name}',
               ),
               const Spacer(),
-              Text(formatPrice(group.total),
+              Text(formatCents(line.lineTotalCents),
                   style: AppTypography.cardTitle
                       .copyWith(fontWeight: FontWeight.w700)),
             ],
@@ -407,7 +484,10 @@ class _Row extends StatelessWidget {
             fontSize: bold ? 19 : 16);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [Text(label, style: style), Text(value, style: style)],
+      children: [
+        Flexible(child: Text(label, style: style)),
+        Text(value, style: style),
+      ],
     );
   }
 }

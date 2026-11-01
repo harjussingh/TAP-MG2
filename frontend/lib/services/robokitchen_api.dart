@@ -63,13 +63,13 @@ class RoboKitchenApi {
   Future<void> forgotPassword(String email) =>
       _c.post('/auth/forgot-password', body: {'email': email});
 
-  Future<void> resetPassword(String token, String newPassword) => _c.post(
-      '/auth/reset-password',
-      body: {'token': token, 'new_password': newPassword});
+  Future<void> resetPassword(String token, String newPassword) =>
+      _c.post('/auth/reset-password',
+          body: {'token': token, 'new_password': newPassword});
 
-  Future<void> changePassword(String current, String next) => _c.post(
-      '/users/me/change-password',
-      body: {'current_password': current, 'new_password': next});
+  Future<void> changePassword(String current, String next) =>
+      _c.post('/users/me/change-password',
+          body: {'current_password': current, 'new_password': next});
 
   Future<ApiUser> updateProfile({
     String? fullName,
@@ -91,25 +91,11 @@ class RoboKitchenApi {
 
   /// The printed QR points at FRONTEND_URL/?table=CODE. Read the code from
   /// the deep link, then call this.
-  ///
-  /// Kept for the per-table QR codes an admin can still print. The flow the
-  /// client asked for is [tableByNumber].
-  Future<TableScan> scanTable(String code) async =>
-      TableScan.fromJson(await _c.get('/tables/scan/$code') as Map<String, dynamic>);
+  Future<TableScan> scanTable(String code) async => TableScan.fromJson(
+      await _c.get('/tables/scan/$code') as Map<String, dynamic>);
 
-  /// The table numbers a customer may type, lowest first.
-  ///
-  /// Worth fetching once on the table screen so a wrong number can be
-  /// refused before the keypad is even submitted.
-  Future<List<int>> tableNumbers() async =>
-      ((await _c.get('/tables/numbers')) as List<dynamic>)
-          .map((n) => n as int)
-          .toList();
-
-  /// Single-QR flow: the customer types the number printed on their table.
-  ///
-  /// Returns exactly what a scan returns, so both routes into the app give
-  /// the same context. Throws on 404 when the number is not a live table.
+  /// Single-QR flow: the customer types their table number. Returns exactly
+  /// what a scan returns. Throws on 404 when the number is not a live table.
   Future<TableScan> tableByNumber(int number) async => TableScan.fromJson(
       await _c.get('/tables/by-number/$number') as Map<String, dynamic>);
 
@@ -127,6 +113,7 @@ class RoboKitchenApi {
     List<String> excludeAllergens = const [],
     String? itemType,
     bool? featured,
+    bool includeUnavailable = false,
     int page = 1,
     int size = 50,
   }) async =>
@@ -139,6 +126,8 @@ class RoboKitchenApi {
             'exclude_allergens': excludeAllergens,
           'item_type': itemType,
           'featured': featured,
+          // Sold-out items are still listed so the menu can show them greyed.
+          if (includeUnavailable) 'include_unavailable': true,
           'page': page,
           'size': size,
         }) as Map<String, dynamic>,
@@ -147,8 +136,8 @@ class RoboKitchenApi {
 
   /// Use this before opening the builder: the list endpoint may not expand
   /// option groups, the detail endpoint always does.
-  Future<MenuItem> menuItem(String idOrSlug) async =>
-      MenuItem.fromJson(await _c.get('/menu/items/$idOrSlug') as Map<String, dynamic>);
+  Future<MenuItem> menuItem(String idOrSlug) async => MenuItem.fromJson(
+      await _c.get('/menu/items/$idOrSlug') as Map<String, dynamic>);
 
   /// Live price as the customer picks. Debounce roughly 250ms.
   ///
@@ -189,19 +178,17 @@ class RoboKitchenApi {
 
   Future<Cart> updateCartLine(String lineId, {int? quantity}) async =>
       Cart.fromJson(await _c.patch('/cart/items/$lineId',
-          body: {if (quantity != null) 'quantity': quantity}) as Map<String, dynamic>);
+              body: {if (quantity != null) 'quantity': quantity})
+          as Map<String, dynamic>);
 
-  Future<Cart> removeCartLine(String lineId) async =>
-      Cart.fromJson(await _c.delete('/cart/items/$lineId') as Map<String, dynamic>);
+  Future<Cart> removeCartLine(String lineId) async => Cart.fromJson(
+      await _c.delete('/cart/items/$lineId') as Map<String, dynamic>);
 
   Future<Cart> clearCart() async =>
       Cart.fromJson(await _c.delete('/cart') as Map<String, dynamic>);
 
-  /// Attach the table, or switch to takeaway.
-  ///
-  /// Give either [tableCode] (from a scanned QR) or [tableNumber] (typed on
-  /// the table screen); the backend resolves either to the same table. Pass
-  /// neither for takeaway, which clears the table on the cart.
+  /// Attach the scanned table (by QR code or by the number the customer
+  /// typed), or switch to takeaway. A 404 means the table does not exist.
   Future<Cart> setCartContext({
     String? tableCode,
     int? tableNumber,
@@ -251,8 +238,9 @@ class RoboKitchenApi {
       await _c.post('/payments/$orderId/mock-confirm', orderId: orderId)
           as Map<String, dynamic>);
 
-  Future<Order> order(String orderId) async => Order.fromJson(
-      await _c.get('/orders/$orderId', orderId: orderId) as Map<String, dynamic>);
+  Future<Order> order(String orderId) async =>
+      Order.fromJson(await _c.get('/orders/$orderId', orderId: orderId)
+          as Map<String, dynamic>);
 
   Future<Paged<Order>> myOrders({int page = 1, int size = 20}) async =>
       Paged.fromJson(
@@ -304,12 +292,19 @@ class RoboKitchenApi {
     required String name,
     required String menuItemId,
     required List<Selection> selections,
+    String? specialInstructions,
   }) async =>
       SavedRecipe.fromJson(await _c.post('/recipes', body: {
         'name': name,
         'menu_item_id': menuItemId,
         'selections': selections.map((s) => s.toJson()).toList(),
+        if (specialInstructions != null && specialInstructions.isNotEmpty)
+          'special_instructions': specialInstructions,
       }) as Map<String, dynamic>);
+
+  Future<SavedRecipe> renameRecipe(String id, String name) async =>
+      SavedRecipe.fromJson(await _c.patch('/recipes/$id', body: {'name': name})
+          as Map<String, dynamic>);
 
   Future<void> deleteRecipe(String id) => _c.delete('/recipes/$id');
 

@@ -74,7 +74,8 @@ class _RoomPainter extends CustomPainter {
 
   // Warm daylight, or a low evening room in dark mode. Same composition
   // either way; only the palette moves.
-  Color get _wallTop => dark ? const Color(0xFF241F1A) : const Color(0xFFF6E7D2);
+  Color get _wallTop =>
+      dark ? const Color(0xFF241F1A) : const Color(0xFFF6E7D2);
   Color get _wallBottom =>
       dark ? const Color(0xFF1A1613) : const Color(0xFFEFD9BE);
   Color get _window => dark ? const Color(0xFF2B3A4A) : const Color(0xFFCFE8F5);
@@ -135,8 +136,8 @@ class _RoomPainter extends CustomPainter {
     final wh = h * 0.42;
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-          Rect.fromLTWH(x - 4, y - 4, ww + 8, wh + 8), const Radius.circular(10)),
+      RRect.fromRectAndRadius(Rect.fromLTWH(x - 4, y - 4, ww + 8, wh + 8),
+          const Radius.circular(10)),
       Paint()..color = _frame,
     );
     canvas.drawRRect(
@@ -148,8 +149,7 @@ class _RoomPainter extends CustomPainter {
     final bar = Paint()
       ..color = _frame
       ..strokeWidth = 3;
-    canvas.drawLine(
-        Offset(x + ww / 2, y), Offset(x + ww / 2, y + wh), bar);
+    canvas.drawLine(Offset(x + ww / 2, y), Offset(x + ww / 2, y + wh), bar);
     canvas.drawLine(
         Offset(x, y + wh * 0.45), Offset(x + ww, y + wh * 0.45), bar);
 
@@ -198,7 +198,9 @@ class _RoomPainter extends CustomPainter {
     // Dome
     canvas.drawArc(
       Rect.fromCenter(
-          center: Offset(cx, base - u * 0.62), width: u * 0.48, height: u * 0.48),
+          center: Offset(cx, base - u * 0.62),
+          width: u * 0.48,
+          height: u * 0.48),
       math.pi,
       math.pi,
       true,
@@ -400,14 +402,14 @@ class _RoomPainter extends CustomPainter {
     }
 
     // Table top, seen at a slight angle
-    final top = Rect.fromCenter(
-        center: Offset(cx, topY), width: tw, height: h * 0.15);
-    canvas.drawOval(
-        top.translate(0, h * 0.012), Paint()..color = _tableEdge);
+    final top =
+        Rect.fromCenter(center: Offset(cx, topY), width: tw, height: h * 0.15);
+    canvas.drawOval(top.translate(0, h * 0.012), Paint()..color = _tableEdge);
     canvas.drawOval(top, Paint()..color = _tableTop);
 
     // The card, popping a little as each digit lands.
-    final pop = 1 + (1 - Curves.easeOutBack.transform(landed.clamp(0, 1))) * 0.14;
+    final pop =
+        1 + (1 - Curves.easeOutBack.transform(landed.clamp(0, 1))) * 0.14;
     final cardW = w * 0.30 * pop;
     final cardH = h * 0.30 * pop;
     final cardRect = Rect.fromCenter(
@@ -463,7 +465,8 @@ class _RoomPainter extends CustomPainter {
       textDirection: ui.TextDirection.ltr,
       textAlign: TextAlign.center,
     )..layout();
-    tp.paint(canvas, Offset(centre.dx - tp.width / 2, centre.dy - tp.height / 2));
+    tp.paint(
+        canvas, Offset(centre.dx - tp.width / 2, centre.dy - tp.height / 2));
   }
 
   @override

@@ -18,8 +18,8 @@ class ApiException implements Exception {
 
   bool get isUnauthenticated => statusCode == 401;
   bool get isForbidden => statusCode == 403;
-  bool get isConflict => statusCode == 409;      // sold out, invalid transition
-  bool get isValidation => statusCode == 422;    // broke a min/max rule
+  bool get isConflict => statusCode == 409; // sold out, invalid transition
+  bool get isValidation => statusCode == 422; // broke a min/max rule
   bool get isRateLimited => statusCode == 429;
   bool get isNetwork => statusCode == 0;
 
@@ -68,8 +68,12 @@ class ApiClient {
 
   Future<dynamic> get(String path,
           {Map<String, dynamic>? query, String? orderId}) =>
-      _send(() => _client.get(_uri(path, query),
-          headers: _headers(orderId: orderId)), path, query, orderId);
+      _send(
+          () => _client.get(_uri(path, query),
+              headers: _headers(orderId: orderId)),
+          path,
+          query,
+          orderId);
 
   Future<dynamic> post(String path,
           {Object? body, Map<String, dynamic>? query, String? orderId}) =>

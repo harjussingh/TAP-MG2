@@ -22,7 +22,7 @@ class _EditDetailsScreenState extends State<EditDetailsScreen> {
   final _email = TextEditingController();
   final _phone = TextEditingController();
 
-  UserProfile? _draft;
+  bool _filled = false;
   bool _busy = false;
   bool _dirty = false;
 
@@ -32,11 +32,11 @@ class _EditDetailsScreenState extends State<EditDetailsScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_draft != null) return;
+    if (_filled) return;
+    _filled = true;
 
     final profile =
-        AppScope.of(context).profile ?? UserProfile(name: '', email: '');
-    _draft = profile.copy();
+        AppScope.read(context).profile ?? UserProfile(name: '', email: '');
 
     _name.text = profile.name;
     _email.text = profile.email;
@@ -75,24 +75,29 @@ class _EditDetailsScreenState extends State<EditDetailsScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _busy = true);
 
-    // TODO(backend): PATCH the profile, then apply the server's response.
-    await Future<void>.delayed(const Duration(milliseconds: 600));
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      // The server's copy comes back and replaces the one on the device.
+      await AppScope.read(context).updateProfile(
+        name: _name.text.trim(),
+        phone: _phone.text.trim(),
+      );
+    } catch (e) {
+      if (mounted) setState(() => _busy = false);
+      messenger.showSnackBar(SnackBar(content: Text(errorMessage(e))));
+      return;
+    }
     if (!mounted) return;
-
-    final draft = _draft!
-      ..name = _name.text.trim()
-      ..email = _email.text.trim()
-      ..phone = _phone.text.trim();
-    AppScope.of(context).updateProfile(draft);
 
     setState(() {
       _busy = false;
       _dirty = false;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       const SnackBar(content: Text('Your details were saved')),
     );
-    Navigator.pop(context);
+    navigator.pop();
   }
 
   @override

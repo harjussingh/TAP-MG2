@@ -3,10 +3,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
-import '../data/sample_data.dart';
 import '../models/bowl.dart';
 import '../models/ingredient.dart';
-import '../models/order.dart';
+import '../services/api_models.dart' show MenuItem;
 import '../theme/app_colors.dart';
 import '../theme/app_settings.dart';
 import '../theme/app_spacing.dart';
@@ -14,6 +13,7 @@ import '../theme/app_typography.dart';
 import '../widgets/dish_card.dart';
 import '../widgets/feature_card.dart';
 import '../widgets/name_prompt.dart';
+import '../widgets/state_views.dart';
 import 'cart_screen.dart';
 
 /// The six-step builder.
@@ -27,19 +27,26 @@ import 'cart_screen.dart';
 /// leaves the screen.
 
 class BowlBuilderScreen extends StatefulWidget {
-  const BowlBuilderScreen({super.key, this.startFrom});
+  const BowlBuilderScreen({super.key, this.startFrom, this.item});
 
   /// A saved recipe to reopen. The builder works on a copy, so editing a
   /// reopened bowl does not quietly rewrite the one in the saved list.
   final Bowl? startFrom;
+
+  /// The build-your-own menu item; its option groups are the steps' choices.
+  /// When neither this nor [startFrom] is given, it is fetched from the menu.
+  final MenuItem? item;
 
   @override
   State<BowlBuilderScreen> createState() => _BowlBuilderScreenState();
 }
 
 class _BowlBuilderScreenState extends State<BowlBuilderScreen> {
-  late final Bowl _bowl;
+  late Bowl _bowl;
   late int _step;
+  bool _loading = false;
+  bool _sending = false;
+  String? _loadError;
 
   /// True when this was opened from the saved list, which changes what the
   /// last step offers: saving again should add a variation, not a duplicate.
@@ -50,10 +57,40 @@ class _BowlBuilderScreenState extends State<BowlBuilderScreen> {
     super.initState();
     // widget is available here; inherited widgets are not, which is why
     // nothing in this method reads AppScope.
-    _bowl = widget.startFrom?.copy() ?? Bowl();
+    _bowl = widget.startFrom?.copy() ?? Bowl(widget.item);
     // A saved recipe is already complete, so it opens on the review step
     // with every section one tap away rather than walking all six again.
     _step = _reopened ? 6 : 1;
+    if (_bowl.item == null) {
+      _loading = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadItem());
+    }
+  }
+
+  /// Fetches the build-your-own item when the builder was opened without it.
+  Future<void> _loadItem() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final item = await AppScope.read(context).loadCustomBowlItem();
+      if (!mounted) return;
+      setState(() {
+        if (item != null) _bowl = Bowl(item);
+        _loadError = item == null
+            ? 'Build your own is not on the menu right now.'
+            : null;
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadError = errorMessage(e);
+          _loading = false;
+        });
+      }
+    }
   }
 
   static const _titles = [
@@ -113,31 +150,42 @@ class _BowlBuilderScreenState extends State<BowlBuilderScreen> {
 
   void _surpriseMe() {
     final rng = Random();
+    Ingredient? pick(List<Ingredient> options) {
+      final inStock = options.where((i) => i.inStock).toList();
+      return inStock.isEmpty ? null : inStock[rng.nextInt(inStock.length)];
+    }
+
     setState(() {
-      _bowl.base = kBases[rng.nextInt(kBases.length)];
-      final proteins = kProteins.where((i) => i.inStock).toList();
-      _bowl.protein = proteins[rng.nextInt(proteins.length)];
+      _bowl.base = pick(_bowl.bases);
+      _bowl.protein = pick(_bowl.proteins);
       _bowl.vegetables
         ..clear()
-        ..addAll((kVegetables.where((i) => i.inStock).toList()..shuffle(rng))
-            .take(2));
-      _bowl.sauce = kSauces[rng.nextInt(kSauces.length)];
+        ..addAll((_bowl.vegetableOptions.where((i) => i.inStock).toList()
+              ..shuffle(rng))
+            .take(min(2, _bowl.maxVegetables)));
+      _bowl.sauce = pick(_bowl.sauces);
       _bowl.spice = rng.nextInt(4);
       _bowl.toppings.clear();
       _step = 6;
     });
   }
 
-  void _sendToMachine() {
-    final state = AppScope.of(context);
-    state.addToCart(CartLine(
-      title: 'Build Your Own Bowl',
-      subtitle: _bowl.summary,
-      emoji: '\u{1F963}',
-      price: _bowl.price,
-      kilojoules: _bowl.kilojoules,
-      isCustom: true,
-    ));
+  /// The server checks every choice (stock, min and max per group) and
+  /// prices the line; the cart is only shown once it has accepted it.
+  Future<void> _sendToMachine() async {
+    setState(() => _sending = true);
+    try {
+      await AppScope.read(context).addBowlToCart(_bowl);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _sending = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(errorMessage(e))));
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _sending = false);
 
     showAddedToCart(
       context,
@@ -153,8 +201,9 @@ class _BowlBuilderScreenState extends State<BowlBuilderScreen> {
     );
   }
 
-  String _energyLabel(Ingredient i) =>
-      i.kilojoules == 0 ? 'Included' : '${i.kilojoules > 0 ? '+' : ''}${i.kilojoules} kJ';
+  String _energyLabel(Ingredient i) => i.kilojoules == 0
+      ? 'Included'
+      : '${i.kilojoules > 0 ? '+' : ''}${i.kilojoules} kJ';
 
   String? _priceLabel(Ingredient i) =>
       i.price > 0 ? '+ ${formatPrice(i.price)}' : null;
@@ -162,6 +211,20 @@ class _BowlBuilderScreenState extends State<BowlBuilderScreen> {
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
+
+    if (_loading || _loadError != null) {
+      return Scaffold(
+        backgroundColor: AppColors.surface,
+        appBar: AppBar(title: const Text('Build your own')),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ErrorStateView(
+                title: "We couldn't open the builder",
+                message: _loadError!,
+                onRetry: _loadItem,
+              ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -195,11 +258,20 @@ class _BowlBuilderScreenState extends State<BowlBuilderScreen> {
               child: KeyedSubtree(key: ValueKey(_step), child: _stepBody()),
             ),
           ),
-          // Footer directly under the content — compact, always present.
+        ],
+      ),
+      // Footer pinned under the content — compact, always present. As the
+      // Scaffold's bottom bar, snack bars appear above it rather than on top
+      // of the button.
+      // The Column only shrinks the bar to its own height: the bar lays out
+      // with a LayoutBuilder, which would otherwise take the whole screen.
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           _BottomBar(
             bowl: _bowl,
             isLast: _step == 6,
-            canAdvance: _canAdvance && !_bowl.isOverCapacity,
+            canAdvance: _canAdvance && !_bowl.isOverCapacity && !_sending,
             onNext: _step == 6 ? _sendToMachine : _next,
             onBack: _back,
             onSkip: _onSkip,
@@ -214,7 +286,7 @@ class _BowlBuilderScreenState extends State<BowlBuilderScreen> {
       case 1:
         return _list([
           _grid(
-            kBases,
+            _bowl.bases,
             isSelected: (o) => _bowl.base?.id == o.id,
             onTap: (o) => setState(() => _bowl.base = o),
           ),
@@ -223,34 +295,30 @@ class _BowlBuilderScreenState extends State<BowlBuilderScreen> {
       case 2:
         return _list([
           _grid(
-            kProteins,
+            _bowl.proteins,
             isSelected: (o) => _bowl.protein?.id == o.id,
             onTap: (o) => setState(() => _bowl.protein = o),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _PortionToggle(
-            large: _bowl.largePortion,
-            onChanged: (v) => setState(() => _bowl.largePortion = v),
           ),
         ]);
 
       case 3:
         return _list([
           _Counter(
-            label: '${_bowl.vegetables.length} of ${Bowl.maxVegetables} chosen',
+            label:
+                '${_bowl.vegetables.length} of ${_bowl.maxVegetables} chosen',
           ),
           _grid(
-            kVegetables,
+            _bowl.vegetableOptions,
             isSelected: (o) => _bowl.vegetables.contains(o),
             // A vegetable already chosen stays tappable so it can be taken
             // back off once the limit is reached.
             available: (o) =>
                 o.inStock &&
                 (_bowl.vegetables.contains(o) ||
-                    _bowl.vegetables.length < Bowl.maxVegetables),
+                    _bowl.vegetables.length < _bowl.maxVegetables),
             onTap: (o) => setState(() {
               if (!_bowl.vegetables.remove(o) &&
-                  _bowl.vegetables.length < Bowl.maxVegetables) {
+                  _bowl.vegetables.length < _bowl.maxVegetables) {
                 _bowl.vegetables.add(o);
               }
             }),
@@ -260,7 +328,7 @@ class _BowlBuilderScreenState extends State<BowlBuilderScreen> {
       case 4:
         return _list([
           _grid(
-            kSauces,
+            _bowl.sauces,
             isSelected: (o) => _bowl.sauce?.id == o.id,
             onTap: (o) => setState(() => _bowl.sauce = o),
           ),
@@ -275,10 +343,17 @@ class _BowlBuilderScreenState extends State<BowlBuilderScreen> {
       case 5:
         return _list([
           _grid(
-            kToppings,
+            _bowl.toppingOptions,
             isSelected: (o) => _bowl.toppings.contains(o),
+            available: (o) =>
+                o.inStock &&
+                (_bowl.toppings.contains(o) ||
+                    _bowl.toppings.length < _bowl.maxToppings),
             onTap: (o) => setState(() {
-              if (!_bowl.toppings.remove(o)) _bowl.toppings.add(o);
+              if (!_bowl.toppings.remove(o) &&
+                  _bowl.toppings.length < _bowl.maxToppings) {
+                _bowl.toppings.add(o);
+              }
             }),
           ),
         ]);
@@ -304,9 +379,15 @@ class _BowlBuilderScreenState extends State<BowlBuilderScreen> {
     );
     if (name == null || !mounted) return;
 
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await AppScope.read(context).saveBowl(_bowl, name: name);
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(errorMessage(e))));
+      return;
+    }
     _bowl.name = name;
-    AppScope.of(context).saveBowl(_bowl, name: name);
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       SnackBar(content: Text('Saved as "${_bowl.displayName}"')),
     );
   }
@@ -348,7 +429,10 @@ class _BowlBuilderScreenState extends State<BowlBuilderScreen> {
               ingredient: option,
               isSelected: isSelected(option),
               available: available?.call(option) ?? option.inStock,
-              energyLabel: _energyLabel(option),
+              // The surcharge goes first: it is what people decide on.
+              energyLabel: [_priceLabel(option), _energyLabel(option)]
+                  .whereType<String>()
+                  .join(' · '),
               onTap: () => onTap(option),
               // Spread the bob out of step across the grid.
               bobPhase: (index % 4) / 4,
@@ -456,7 +540,8 @@ class _IngredientTileState extends State<_IngredientTile>
       opacity: widget.available ? 1 : 0.5,
       child: GestureDetector(
         onTap: widget.available ? widget.onTap : null,
-        onTapDown: widget.available ? (_) => setState(() => _pressed = true) : null,
+        onTapDown:
+            widget.available ? (_) => setState(() => _pressed = true) : null,
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
         child: AnimatedScale(
@@ -519,8 +604,7 @@ class _IngredientTileState extends State<_IngredientTile>
                           builder: (context, child) {
                             final t = still
                                 ? 0.0
-                                : sin((_bob.value + widget.bobPhase) *
-                                    2 * pi);
+                                : sin((_bob.value + widget.bobPhase) * 2 * pi);
                             return Transform.translate(
                               offset: Offset(0, -t * 3),
                               child: child,
@@ -663,13 +747,13 @@ class _Header extends StatelessWidget {
               Row(
                 children: [
                   Text('STEP $step OF 6',
-                      style: AppTypography.label.copyWith(
-                          color: onBand, letterSpacing: 1.4)),
+                      style: AppTypography.label
+                          .copyWith(color: onBand, letterSpacing: 1.4)),
                   const Spacer(),
                   TextButton.icon(
                     onPressed: onSurprise,
-                    icon: const Text('\u{1F3B2}',
-                        style: TextStyle(fontSize: 15)),
+                    icon:
+                        const Text('\u{1F3B2}', style: TextStyle(fontSize: 15)),
                     label: Text('Surprise me',
                         style: AppTypography.label.copyWith(
                             color: onBand, fontWeight: FontWeight.w600)),
@@ -860,15 +944,15 @@ class _PickedChips extends StatelessWidget {
               curve: Curves.easeOutBack,
               builder: (context, v, child) =>
                   Transform.scale(scale: v.clamp(0.0, 1.2), child: child),
-              child: shell(
-                  Text(item.emoji, style: const TextStyle(fontSize: 15))),
+              child:
+                  shell(Text(item.emoji, style: const TextStyle(fontSize: 15))),
             ),
             const SizedBox(width: AppSpacing.xs),
           ],
         if (extra > 0)
           shell(Text('+$extra',
-              style: AppTypography.label.copyWith(
-                  color: Colors.white, fontWeight: FontWeight.w700))),
+              style: AppTypography.label
+                  .copyWith(color: Colors.white, fontWeight: FontWeight.w700))),
       ],
     );
   }
@@ -881,8 +965,8 @@ class _CapacityWarning extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(AppSpacing.screenPadding,
-          AppSpacing.md, AppSpacing.screenPadding, 0),
+      margin: const EdgeInsets.fromLTRB(
+          AppSpacing.screenPadding, AppSpacing.md, AppSpacing.screenPadding, 0),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: AppColors.error.withValues(alpha: 0.10),
@@ -896,8 +980,7 @@ class _CapacityWarning extends StatelessWidget {
           Expanded(
             child: Text(
               'The bowl is full. Remove something before adding more.',
-              style:
-                  AppTypography.secondary.copyWith(color: AppColors.error),
+              style: AppTypography.secondary.copyWith(color: AppColors.error),
             ),
           ),
         ],
@@ -916,40 +999,6 @@ class _Counter extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Text(label, style: AppTypography.secondary),
-    );
-  }
-}
-
-class _PortionToggle extends StatelessWidget {
-  const _PortionToggle({required this.large, required this.onChanged});
-
-  final bool large;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    SettingsScope.watch(context);
-    return Material(
-      color: AppColors.card,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-        side: BorderSide(color: AppColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
-        child: SwitchListTile.adaptive(
-          value: large,
-          onChanged: onChanged,
-          contentPadding: EdgeInsets.zero,
-          activeThumbColor: AppColors.primary,
-          title: Text('Large portion',
-              style: AppTypography.body.copyWith(fontWeight: FontWeight.w600)),
-          subtitle: Text('Adds \$3.50 and about 700 kJ',
-              style: AppTypography.secondary),
-        ),
-      ),
     );
   }
 }
@@ -1087,7 +1136,8 @@ class _SpiceKnob extends StatelessWidget {
             // Tick ring around the knob.
             CustomPaint(
               size: const Size(_size, _size),
-              painter: _TickPainter(spice: spice, heat: heat, base: AppColors.border),
+              painter: _TickPainter(
+                  spice: spice, heat: heat, base: AppColors.border),
             ),
             // Brushed-metal knob body.
             Container(
@@ -1309,8 +1359,7 @@ class _ReviewState extends State<_Review> {
             active: _active),
         _Line(
           label: 'Protein',
-          value:
-              '${bowl.protein?.name ?? 'Not chosen'} · ${bowl.largePortion ? 'Large' : 'Regular'}',
+          value: bowl.protein?.name ?? 'Not chosen',
           step: 2,
           onEdit: onEdit,
           active: _active,
@@ -1326,8 +1375,7 @@ class _ReviewState extends State<_Review> {
         ),
         _Line(
           label: 'Sauce',
-          value:
-              '${bowl.sauce?.name ?? 'Not chosen'} · ${bowl.spiceLabel}',
+          value: '${bowl.sauce?.name ?? 'Not chosen'} · ${bowl.spiceLabel}',
           step: 4,
           onEdit: onEdit,
           active: _active,
@@ -1556,8 +1604,8 @@ class _BottomBar extends StatelessWidget {
               // longer and it never has a Skip, so it takes its own width.
               const barH = 42.0; // minimal control height for a tappable bar
               final skipSlot = tight ? 46.0 : 60.0;
-              // Review's button is a little wider than a step's so "Place
-              // Order" fits, but kept trim so the price keeps its room.
+              // Review's button is a little wider than a step's so "Add to
+              // order" fits, but kept trim so the price keeps its room.
               final nextWidth = isLast ? 150.0 : (tight ? 118.0 : 134.0);
 
               return Row(
@@ -1596,7 +1644,8 @@ class _BottomBar extends StatelessWidget {
                         Text(formatKilojoules(bowl.kilojoules),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: AppTypography.secondary.copyWith(height: 1.1)),
+                            style:
+                                AppTypography.secondary.copyWith(height: 1.1)),
                       ],
                     ),
                   ),
@@ -1647,7 +1696,9 @@ class _BottomBar extends StatelessWidget {
                         backgroundColor: isLast ? AppColors.success : null,
                         foregroundColor: isLast ? Colors.white : null,
                       ),
-                      child: Text(isLast ? 'Place Order' : 'Next',
+                      // The bowl goes to the cart here; the order itself is
+                      // placed at checkout.
+                      child: Text(isLast ? 'Add to order' : 'Next',
                           maxLines: 1, overflow: TextOverflow.ellipsis),
                     ),
                   ),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../models/dish.dart';
-import '../models/order.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_settings.dart';
 import '../theme/app_spacing.dart';
@@ -36,25 +35,28 @@ class DishDetailScreen extends StatefulWidget {
 
 class _DishDetailScreenState extends State<DishDetailScreen> {
   int _quantity = 1;
-  bool _saved = false;
+  bool _busy = false;
 
   Dish get dish => widget.dish;
 
   double get _lineTotal => dish.price * _quantity;
 
-  void _addToCart() {
-    final state = AppScope.of(context);
-    for (var i = 0; i < _quantity; i++) {
-      state.addToCart(CartLine(
-        title: dish.name,
-        subtitle: dish.sauce.isEmpty
-            ? dish.ingredients
-            : '${dish.ingredients} · ${dish.sauce}',
-        emoji: dish.emoji,
-        price: dish.price,
-        kilojoules: dish.kilojoules,
-      ));
+  /// The server prices the line (with the dish's default options) and
+  /// returns the whole cart; nothing is added if it refuses.
+  Future<void> _addToCart() async {
+    setState(() => _busy = true);
+    try {
+      await AppScope.read(context).addToCart(dish.id, quantity: _quantity);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(errorMessage(e))));
+      }
+      return;
     }
+    if (!mounted) return;
+    setState(() => _busy = false);
 
     showAddedToCart(
       context,
@@ -72,15 +74,34 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
 
   void _openBuilder() {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const BowlBuilderScreen()),
+      MaterialPageRoute<void>(
+          builder: (_) => BowlBuilderScreen(item: dish.item)),
     );
+  }
+
+  /// The heart saves the dish to the account's saved list.
+  Future<void> _toggleSaved() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final state = AppScope.read(context);
+    final wasSaved = state.isDishSaved(dish.id);
+    try {
+      await state.toggleDishSaved(dish);
+      messenger.showSnackBar(SnackBar(
+          content: Text(wasSaved
+              ? '${dish.name} removed from saved'
+              : '${dish.name} saved')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(errorMessage(e))));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
     // Saving a bowl needs an account, so a guest never sees the save control.
-    final isMember = AppScope.of(context).isMember;
+    final state = AppScope.of(context);
+    final isMember = state.isMember;
+    final saved = isMember && state.isDishSaved(dish.id);
 
     return Scaffold(
       // The sheet's rounded top corners reveal this background in two small
@@ -93,9 +114,9 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
           _Hero(
             dish: dish,
             palette: widget.palette,
-            saved: _saved,
+            saved: saved,
             onBack: () => Navigator.pop(context),
-            onSave: () => setState(() => _saved = !_saved),
+            onSave: _toggleSaved,
             showSave: isMember,
           ),
           Expanded(
@@ -122,8 +143,7 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
                       onQuantity: (v) => setState(() => _quantity = v),
                     ),
                     const SizedBox(height: AppSpacing.xl),
-                    Text('About this bowl',
-                        style: AppTypography.cardTitle),
+                    Text('About this bowl', style: AppTypography.cardTitle),
                     const SizedBox(height: AppSpacing.sm),
                     Text(dish.description,
                         style: AppTypography.body.copyWith(height: 1.55)),
@@ -142,8 +162,9 @@ class _DishDetailScreenState extends State<DishDetailScreen> {
       bottomNavigationBar: _BottomBar(
         dish: dish,
         total: _lineTotal,
-        saved: _saved,
-        onSave: () => setState(() => _saved = !_saved),
+        saved: saved,
+        busy: _busy,
+        onSave: _toggleSaved,
         onPrimary: dish.isCustom ? _openBuilder : _addToCart,
         showSave: isMember,
       ),
@@ -305,8 +326,8 @@ class _TitleBlock extends StatelessWidget {
               ),
             const SizedBox(width: AppSpacing.sm),
             Text(dish.rating.toStringAsFixed(1),
-                style: AppTypography.body
-                    .copyWith(fontWeight: FontWeight.w700)),
+                style:
+                    AppTypography.body.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(width: AppSpacing.xs),
             if (dish.reviewCount > 0)
               Text('(${dish.reviewCount} reviews)',
@@ -348,8 +369,7 @@ class _PriceRow extends StatelessWidget {
         const Spacer(),
         // A custom bowl is priced inside the builder, so a quantity here
         // would be meaningless.
-        if (!isCustom)
-          QuantityStepper(value: quantity, onChanged: onQuantity),
+        if (!isCustom) QuantityStepper(value: quantity, onChanged: onQuantity),
       ],
     );
   }
@@ -439,8 +459,7 @@ class _AllergenNote extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.warning_amber_rounded,
-              size: 20, color: AppColors.primary),
+          Icon(Icons.warning_amber_rounded, size: 20, color: AppColors.primary),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
@@ -454,8 +473,7 @@ class _AllergenNote extends StatelessWidget {
                   dish.isCustom
                       ? 'Varies with what you choose. Every ingredient is '
                           'labelled in the builder.'
-                      : 'Contains fish, soy and sesame. Prepared in a kitchen '
-                          'that handles all major allergens.',
+                      : _allergenText(dish.item?.allergens ?? const []),
                   style: AppTypography.secondary,
                 ),
               ],
@@ -467,11 +485,23 @@ class _AllergenNote extends StatelessWidget {
   }
 }
 
+/// "Contains fish, egg and soy. Prepared in a kitchen ..." from the API.
+String _allergenText(List<String> allergens) {
+  const tail = 'Prepared in a kitchen that handles all major allergens.';
+  if (allergens.isEmpty) return 'No major allergens listed. $tail';
+  final words = allergens.map((a) => a.replaceAll('_', ' ')).toList();
+  final list = words.length == 1
+      ? words.first
+      : '${words.sublist(0, words.length - 1).join(', ')} and ${words.last}';
+  return 'Contains $list. $tail';
+}
+
 class _BottomBar extends StatelessWidget {
   const _BottomBar({
     required this.dish,
     required this.total,
     required this.saved,
+    required this.busy,
     required this.onSave,
     required this.onPrimary,
     required this.showSave,
@@ -480,6 +510,7 @@ class _BottomBar extends StatelessWidget {
   final Dish dish;
   final double total;
   final bool saved;
+  final bool busy;
   final VoidCallback onSave;
   final VoidCallback onPrimary;
   final bool showSave;
@@ -520,14 +551,19 @@ class _BottomBar extends StatelessWidget {
               ],
               Expanded(
                 child: ElevatedButton(
-                  onPressed: unavailable ? null : onPrimary,
-                  child: Text(
-                    unavailable
-                        ? 'Out of stock'
-                        : dish.isCustom
-                            ? 'Start building'
-                            : 'Add · ${formatPrice(total)}',
-                  ),
+                  onPressed: unavailable || busy ? null : onPrimary,
+                  child: busy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(
+                          unavailable
+                              ? 'Out of stock'
+                              : dish.isCustom
+                                  ? 'Start building'
+                                  : 'Add · ${formatPrice(total)}',
+                        ),
                 ),
               ),
             ],

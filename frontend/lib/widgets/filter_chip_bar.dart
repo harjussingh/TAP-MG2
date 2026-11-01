@@ -9,7 +9,8 @@ import '../theme/app_typography.dart';
 /// Chips are 40 high inside a 48 tap target. Making the visible element
 /// smaller than its target is fine; making the target smaller is the mistake.
 class FilterChipBar extends StatelessWidget {
-  const FilterChipBar({super.key, required this.selected, required this.onChanged});
+  const FilterChipBar(
+      {super.key, required this.selected, required this.onChanged});
 
   final MenuFilter selected;
   final ValueChanged<MenuFilter> onChanged;
@@ -21,7 +22,8 @@ class FilterChipBar extends StatelessWidget {
       height: AppSpacing.minTouchTarget,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+        padding:
+            const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
         itemCount: MenuFilter.values.length,
         separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
         itemBuilder: (context, index) {

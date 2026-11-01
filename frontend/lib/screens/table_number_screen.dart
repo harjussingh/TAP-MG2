@@ -28,6 +28,21 @@ class TableNumberScreen extends StatefulWidget {
 class _TableNumberScreenState extends State<TableNumberScreen>
     with TickerProviderStateMixin {
   String _value = '';
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Opened from a table's own QR code: the table is already known.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final code = AppScope.read(context).pendingTableCode;
+      if (code != null) {
+        _run(() => AppScope.read(context).chooseTableByCode(code));
+      }
+    });
+  }
 
   late final AnimationController _intro = AnimationController(
     vsync: this,
@@ -59,6 +74,8 @@ class _TableNumberScreenState extends State<TableNumberScreen>
   bool get _ready => _value.isNotEmpty;
 
   void _press(String key) {
+    if (_busy) return;
+    if (_error != null) setState(() => _error = null);
     if (key == 'del') {
       if (_value.isEmpty) return;
       HapticFeedback.selectionClick();
@@ -79,13 +96,34 @@ class _TableNumberScreenState extends State<TableNumberScreen>
   }
 
   void _enterApp(OrderType type) {
-    final state = AppScope.of(context);
-    state.setOrderType(type);
-    state.setTableNumber(type == OrderType.dineIn ? _value.padLeft(2, '0') : '');
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const HomeShell()),
-      (route) => false,
-    );
+    final state = AppScope.read(context);
+    _run(() => type == OrderType.dineIn
+        ? state.chooseTable(int.parse(_value))
+        : state.chooseTakeaway());
+  }
+
+  /// The server checks the table exists, so a mistyped number is caught here
+  /// rather than at checkout.
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await action();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const HomeShell()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (mounted) {
+        HapticFeedback.heavyImpact();
+        setState(() => _error = errorMessage(e));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Widget _stagger(double start, Widget child, {double rise = 20}) {
@@ -207,8 +245,8 @@ class _TableNumberScreenState extends State<TableNumberScreen>
     required double keyHeight,
     required double safeBottom,
   }) {
-    final radius = BorderRadius.vertical(
-        top: Radius.circular(AppSpacing.radiusSheet));
+    final radius =
+        BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusSheet));
 
     return Container(
       decoration: BoxDecoration(color: AppColors.card, borderRadius: radius),
@@ -224,9 +262,16 @@ class _TableNumberScreenState extends State<TableNumberScreen>
                   style: AppTypography.cardTitle
                       .copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 2),
-              Text('It is on the card standing on your table',
-                  style: AppTypography.label
-                      .copyWith(color: AppColors.textSecondary)),
+              // A refused number replaces the hint in the same place, so
+              // nothing on the sheet moves.
+              Text(_error ?? 'It is on the card standing on your table',
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.label.copyWith(
+                      color: _error == null
+                          ? AppColors.textSecondary
+                          : AppColors.error)),
               const SizedBox(height: AppSpacing.lg),
               _Keypad(
                 onKey: _press,
@@ -235,12 +280,13 @@ class _TableNumberScreenState extends State<TableNumberScreen>
               ),
               const SizedBox(height: AppSpacing.md),
               _Confirm(
-                ready: _ready,
+                ready: _ready && !_busy,
+                busy: _busy,
                 value: _value,
                 onTap: () => _enterApp(OrderType.dineIn),
               ),
               TextButton(
-                onPressed: () => _enterApp(OrderType.takeaway),
+                onPressed: _busy ? null : () => _enterApp(OrderType.takeaway),
                 style: TextButton.styleFrom(
                     minimumSize: const Size(0, AppSpacing.minTouchTarget)),
                 child: Text("I'm ordering takeaway",
@@ -362,6 +408,9 @@ class _KeyState extends State<_Key> with SingleTickerProviderStateMixin {
     return Semantics(
       button: true,
       label: isDelete ? 'Delete last digit' : widget.label,
+      // The label already says the digit; without this the text inside is
+      // read out a second time.
+      excludeSemantics: true,
       child: GestureDetector(
         onTapDown: (_) => setState(() => _down = true),
         onTapUp: (_) => setState(() => _down = false),
@@ -428,11 +477,13 @@ class _KeyState extends State<_Key> with SingleTickerProviderStateMixin {
 class _Confirm extends StatelessWidget {
   const _Confirm({
     required this.ready,
+    required this.busy,
     required this.value,
     required this.onTap,
   });
 
   final bool ready;
+  final bool busy;
   final String value;
   final VoidCallback onTap;
 
@@ -462,24 +513,31 @@ class _Confirm extends StatelessWidget {
           onTap: ready ? onTap : null,
           borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
           child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  ready ? 'Confirm table $value' : 'Enter your table',
-                  style: AppTypography.body.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color:
-                        ready ? AppColors.onPrimary : AppColors.textSecondary,
+            child: busy
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppColors.textSecondary))
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        ready ? 'Confirm table $value' : 'Enter your table',
+                        style: AppTypography.body.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: ready
+                              ? AppColors.onPrimary
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                      if (ready) ...[
+                        const SizedBox(width: AppSpacing.sm),
+                        Icon(Icons.arrow_forward,
+                            size: 19, color: AppColors.onPrimary),
+                      ],
+                    ],
                   ),
-                ),
-                if (ready) ...[
-                  const SizedBox(width: AppSpacing.sm),
-                  Icon(Icons.arrow_forward,
-                      size: 19, color: AppColors.onPrimary),
-                ],
-              ],
-            ),
           ),
         ),
       ),

@@ -74,8 +74,7 @@ class OptionRow extends StatelessWidget {
                 padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-                  border:
-                      Border.all(color: border, width: selected ? 1.8 : 1),
+                  border: Border.all(color: border, width: selected ? 1.8 : 1),
                 ),
                 child: Row(
                   children: [
