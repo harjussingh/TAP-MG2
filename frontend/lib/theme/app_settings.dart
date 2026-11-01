@@ -100,14 +100,14 @@ class AppSettings extends ChangeNotifier {
 
   void _load() {
     darkMode = _prefs.getBool(_kDark) ?? false;
-    accent = AccentColour.values[
-        (_prefs.getInt(_kAccent) ?? 0).clamp(0, AccentColour.values.length - 1)];
-    textScale = TextScale.values[
-        (_prefs.getInt(_kTextScale) ?? 1).clamp(0, TextScale.values.length - 1)];
+    accent = AccentColour.values[(_prefs.getInt(_kAccent) ?? 0)
+        .clamp(0, AccentColour.values.length - 1)];
+    textScale = TextScale.values[(_prefs.getInt(_kTextScale) ?? 1)
+        .clamp(0, TextScale.values.length - 1)];
     uiStyle = UiStyle.values[
         (_prefs.getInt(_kUiStyle) ?? 0).clamp(0, UiStyle.values.length - 1)];
-    language = AppLanguage.values[
-        (_prefs.getInt(_kLanguage) ?? 0).clamp(0, AppLanguage.values.length - 1)];
+    language = AppLanguage.values[(_prefs.getInt(_kLanguage) ?? 0)
+        .clamp(0, AppLanguage.values.length - 1)];
     pushNotifications = _prefs.getBool(_kPushNotifications) ?? true;
     messageAlerts = _prefs.getBool(_kMessageAlerts) ?? true;
     promotionAlerts = _prefs.getBool(_kPromotionAlerts) ?? false;
@@ -197,12 +197,9 @@ class AppSettings extends ChangeNotifier {
       if (before['accent'] != accent.index) 'Theme colour: ${accent.label}',
       if (before['text'] != textScale.index) 'Text size: ${textScale.label}',
       if (before['ui'] != uiStyle.index) 'UI style: ${uiStyle.label}',
-      if (before['lang'] != language.index)
-        'Language: ${language.nativeName}',
+      if (before['lang'] != language.index) 'Language: ${language.nativeName}',
       if (before['push'] != pushNotifications)
-        pushNotifications
-            ? 'Push notifications on'
-            : 'Push notifications off',
+        pushNotifications ? 'Push notifications on' : 'Push notifications off',
       if (before['msg'] != messageAlerts)
         messageAlerts ? 'Order updates on' : 'Order updates off',
       if (before['promo'] != promotionAlerts)
@@ -243,8 +240,10 @@ class AppSettings extends ChangeNotifier {
 /// to be usable from places that do not have a BuildContext.
 AppSettings? _active;
 
-AppSettings get settings => _active ?? (throw StateError(
-    'AppSettings.install() must be called before the app builds'));
+AppSettings get settings =>
+    _active ??
+    (throw StateError(
+        'AppSettings.install() must be called before the app builds'));
 
 void installSettings(AppSettings value) => _active = value;
 
@@ -271,8 +270,7 @@ class SettingsScope extends InheritedNotifier<AppSettings> {
   }
 
   static AppSettings of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<SettingsScope>();
+    final scope = context.dependOnInheritedWidgetOfExactType<SettingsScope>();
     assert(scope != null, 'SettingsScope is missing above this widget');
     return scope!.notifier!;
   }

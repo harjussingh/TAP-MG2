@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_settings.dart';
 import '../theme/app_spacing.dart';
@@ -52,8 +53,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _busy = true;
     });
 
-    // TODO(api): await api.forgotPassword(value);
-    await Future<void>.delayed(const Duration(milliseconds: 700));
+    try {
+      await AppScope.read(context).api.forgotPassword(value);
+    } catch (e) {
+      // Only a failure to send is shown; an unknown email still "succeeds".
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = errorMessage(e);
+        });
+      }
+      return;
+    }
     if (!mounted) return;
 
     setState(() {
@@ -212,8 +223,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline,
-                    size: 20, color: AppColors.primary),
+                Icon(Icons.info_outline, size: 20, color: AppColors.primary),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Text(
@@ -298,7 +308,8 @@ class AuthPane extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.primary.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-            border: Border.all(color: AppColors.primary.withValues(alpha: 0.45)),
+            border:
+                Border.all(color: AppColors.primary.withValues(alpha: 0.45)),
           ),
           child: Icon(icon, color: AppColors.primary, size: 26),
         ),
@@ -477,7 +488,7 @@ class AuthButton extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           child: busy
               ? SizedBox(
-                  key: ValueKey('busy'),
+                  key: const ValueKey('busy'),
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
@@ -508,10 +519,12 @@ class AuthCheck extends StatelessWidget {
           height: 16,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: ok ? AppColors.success : Colors.white.withValues(alpha: 0.10),
+            color:
+                ok ? AppColors.success : Colors.white.withValues(alpha: 0.10),
           ),
-          child:
-              ok ? const Icon(Icons.check, size: 11, color: Colors.white) : null,
+          child: ok
+              ? const Icon(Icons.check, size: 11, color: Colors.white)
+              : null,
         ),
         const SizedBox(width: AppSpacing.sm),
         Text(label,

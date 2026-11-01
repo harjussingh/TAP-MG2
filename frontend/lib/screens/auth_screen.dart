@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
-import '../models/user_profile.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_settings.dart';
 import '../theme/app_spacing.dart';
@@ -41,8 +40,7 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen>
-    with TickerProviderStateMixin {
+class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   late AuthMode _mode = widget.mode;
 
   final _formKey = GlobalKey<FormState>();
@@ -152,22 +150,40 @@ class _AuthScreenState extends State<AuthScreen>
       _failure = null;
     });
 
-    // TODO(api): RoboKitchenApi.login / register, then mergeGuestCart().
-    // The role is read from the returned token on the server, never sent.
-    await Future<void>.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-
-    final state = AppScope.of(context);
-    final linked = widget.linkGuestOrders ? state.history.length : 0;
+    final state = AppScope.read(context);
+    final messenger = ScaffoldMessenger.of(context);
     final email = _email.text.trim();
 
-    state.signIn(
-      UserProfile(
-        name: _isSignUp ? _name.text.trim() : email.split('@').first,
-        email: email,
-      ),
-      token: 'demo-token',
-    );
+    // The role is read from the returned token on the server, never sent.
+    try {
+      if (_isSignUp) {
+        final pending = await state.register(
+          name: _name.text.trim(),
+          email: email,
+          password: _password.text,
+          keepSignedIn: _keepSignedIn,
+        );
+        if (pending != null) {
+          // The account needs its email verified before the first login.
+          if (!mounted) return;
+          setState(() => _busy = false);
+          _switchTo(AuthMode.signIn);
+          _email.text = email;
+          messenger.showSnackBar(SnackBar(content: Text(pending)));
+          return;
+        }
+      } else {
+        await state.login(email, _password.text, keepSignedIn: _keepSignedIn);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _failure = errorMessage(e);
+      });
+      return;
+    }
+    if (!mounted) return;
 
     if (widget.continueToTable) {
       Navigator.of(context).pushReplacement(
@@ -177,11 +193,10 @@ class _AuthScreenState extends State<AuthScreen>
     }
 
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       SnackBar(
-        content: Text(linked > 0
-            ? 'Account created. $linked past order'
-                '${linked == 1 ? '' : 's'} linked to it.'
+        content: Text(widget.linkGuestOrders
+            ? 'Account created. Your order moved to your account.'
             : 'Welcome to Robomos.'),
       ),
     );
@@ -201,9 +216,9 @@ class _AuthScreenState extends State<AuthScreen>
       backgroundColor: AppColors.card,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final sceneHeight = (constraints.maxHeight *
-                  (_isSignUp ? 0.30 : 0.38))
-              .clamp(130.0, 330.0);
+          final sceneHeight =
+              (constraints.maxHeight * (_isSignUp ? 0.30 : 0.38))
+                  .clamp(130.0, 330.0);
 
           return Column(
             children: [
@@ -248,17 +263,17 @@ class _AuthScreenState extends State<AuthScreen>
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card,
-        borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppSpacing.radiusSheet)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusSheet)),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppSpacing.radiusSheet)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusSheet)),
         child: Form(
           key: _formKey,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.xl,
-                AppSpacing.xl, AppSpacing.xl),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl, AppSpacing.xl, AppSpacing.xl, AppSpacing.xl),
             children: [
               _Headline(isSignUp: _isSignUp),
               const SizedBox(height: AppSpacing.xl),
@@ -283,8 +298,8 @@ class _AuthScreenState extends State<AuthScreen>
               const SizedBox(height: AppSpacing.lg),
               _SwitchPrompt(
                 isSignUp: _isSignUp,
-                onTap: () => _switchTo(
-                    _isSignUp ? AuthMode.signIn : AuthMode.signUp),
+                onTap: () =>
+                    _switchTo(_isSignUp ? AuthMode.signIn : AuthMode.signUp),
               ),
               const SizedBox(height: AppSpacing.md),
             ],
@@ -374,13 +389,12 @@ class _TopBar extends StatelessWidget {
               child: SizedBox(
                 width: AppSpacing.minTouchTarget,
                 height: AppSpacing.minTouchTarget,
-                child: Icon(Icons.arrow_back,
-                    size: 21, color: AppColors.base),
+                child: Icon(Icons.arrow_back, size: 21, color: AppColors.base),
               ),
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          RobomosLogo(size: 36, onDark: false),
+          const RobomosLogo(size: 36, onDark: false),
           const SizedBox(width: AppSpacing.sm),
           Text('Robomos',
               style: AppTypography.cardTitle.copyWith(
@@ -564,7 +578,7 @@ class _FieldState extends State<_Field> {
                             top: AppSpacing.xs, left: AppSpacing.md),
                         child: Row(
                           children: [
-                            Icon(Icons.error_outline,
+                            const Icon(Icons.error_outline,
                                 size: 14, color: AppColors.error),
                             const SizedBox(width: AppSpacing.xs),
                             Expanded(
@@ -602,7 +616,11 @@ class _OptionsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.xs),
-      child: Row(
+      // A Wrap rather than a Row: with large text on a narrow phone the two
+      // don't fit side by side, so "Forgot password?" drops to its own line.
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           InkWell(
             onTap: () => onKeepChanged(!keepSignedIn),
@@ -617,9 +635,8 @@ class _OptionsRow extends StatelessWidget {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: keepSignedIn
-                          ? AppColors.primary
-                          : Colors.transparent,
+                      color:
+                          keepSignedIn ? AppColors.primary : Colors.transparent,
                       shape: BoxShape.circle,
                       border: Border.all(
                           color: keepSignedIn
@@ -638,7 +655,6 @@ class _OptionsRow extends StatelessWidget {
               ),
             ),
           ),
-          const Spacer(),
           TextButton(
             onPressed: onForgot,
             style: TextButton.styleFrom(
@@ -724,7 +740,7 @@ class _FailureNote extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, size: 20, color: AppColors.error),
+          const Icon(Icons.error_outline, size: 20, color: AppColors.error),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(message,

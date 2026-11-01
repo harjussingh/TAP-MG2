@@ -51,13 +51,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Text(S.t('settings'), style: AppTypography.screenTitle),
                   const SizedBox(height: AppSpacing.xs),
-                  Text(S.t('settingsSubtitle'),
-                      style: AppTypography.secondary),
+                  Text(S.t('settingsSubtitle'), style: AppTypography.secondary),
                   const SizedBox(height: AppSpacing.xl),
-
                   const DarkModeCard(),
                   const SizedBox(height: AppSpacing.xl),
-
                   SettingsSectionLabel(S.t('personalisation')),
                   SettingsRow(
                     icon: Icons.palette_outlined,
@@ -72,7 +69,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () => _open(const LanguageScreen()),
                   ),
                   const SizedBox(height: AppSpacing.xl),
-
                   SettingsSectionLabel(S.t('alerts')),
                   SettingsRow(
                     icon: Icons.notifications_outlined,

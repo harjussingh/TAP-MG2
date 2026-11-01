@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../app_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_settings.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'forgot_password_screen.dart';
+import 'intro_screen.dart';
 
 /// Step two of a password reset, opened by the link in the email.
 ///
@@ -75,9 +77,20 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       _failure = null;
     });
 
-    // TODO(api): await api.resetPassword(widget.token, _password.text);
-    // A 400 here means the link expired or was already used.
-    await Future<void>.delayed(const Duration(milliseconds: 800));
+    try {
+      await AppScope.read(context)
+          .api
+          .resetPassword(widget.token, _password.text);
+    } catch (e) {
+      // A 400 here means the link expired or was already used.
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _failure = errorMessage(e);
+        });
+      }
+      return;
+    }
     if (!mounted) return;
 
     setState(() {
@@ -86,7 +99,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     });
 
     await Future<void>.delayed(const Duration(milliseconds: 1400));
-    if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+    // Opened from the email link the reset screen may be the first route,
+    // so go back to the start explicitly rather than popping.
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const IntroScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -212,8 +232,8 @@ class _SuccessState extends State<_Success>
               height: 96,
               decoration: const BoxDecoration(
                   color: AppColors.success, shape: BoxShape.circle),
-              child:
-                  const Icon(Icons.check_rounded, size: 52, color: Colors.white),
+              child: const Icon(Icons.check_rounded,
+                  size: 52, color: Colors.white),
             ),
           ),
           const SizedBox(height: AppSpacing.xl),

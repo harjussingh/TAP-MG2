@@ -65,8 +65,8 @@ class OrderSocket {
             final event = decoded['event'] as String?;
             if (event == 'order.snapshot' || event == 'order.updated') {
               _backoff = const Duration(seconds: 1);
-              _controller.add(
-                  Order.fromJson(decoded['data'] as Map<String, dynamic>));
+              _controller
+                  .add(Order.fromJson(decoded['data'] as Map<String, dynamic>));
             }
           } catch (_) {
             // Ignore anything unparseable rather than killing the stream.
@@ -86,8 +86,7 @@ class OrderSocket {
     if (_stopped) return;
     _retry?.cancel();
     _retry = Timer(_backoff, () {
-      _backoff = Duration(
-          seconds: (_backoff.inSeconds * 2).clamp(1, 30));
+      _backoff = Duration(seconds: (_backoff.inSeconds * 2).clamp(1, 30));
       _open();
     });
   }

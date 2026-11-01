@@ -57,7 +57,10 @@ class FeatureCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _Stars(rating: dish.rating, onColour: palette.onColour),
+                        _Stars(
+                            rating: dish.rating,
+                            label: dish.ratingLabel,
+                            onColour: palette.onColour),
                         const SizedBox(height: AppSpacing.sm),
                         Text(
                           dish.name,
@@ -138,10 +141,9 @@ class _Hero extends StatelessWidget {
             child: Wrap(
               spacing: AppSpacing.xs,
               children: [
-                for (final tag in dish.tags.take(2))
-                  _Pill(label: tag.label),
+                for (final tag in dish.tags.take(2)) _Pill(label: tag.label),
                 if (unavailable)
-                  _Pill(label: 'Out of stock', colour: AppColors.error),
+                  const _Pill(label: 'Out of stock', colour: AppColors.error),
               ],
             ),
           ),
@@ -179,9 +181,11 @@ class _Pill extends StatelessWidget {
 }
 
 class _Stars extends StatelessWidget {
-  const _Stars({required this.rating, required this.onColour});
+  const _Stars(
+      {required this.rating, required this.label, required this.onColour});
 
   final double rating;
+  final String label;
   final Color onColour;
 
   @override
@@ -190,13 +194,15 @@ class _Stars extends StatelessWidget {
       children: [
         for (var i = 1; i <= 5; i++)
           Icon(
-            i <= rating.round() ? Icons.star_rounded : Icons.star_outline_rounded,
+            i <= rating.round()
+                ? Icons.star_rounded
+                : Icons.star_outline_rounded,
             size: 15,
             color: onColour.withValues(alpha: i <= rating.round() ? 1 : 0.45),
           ),
         const SizedBox(width: AppSpacing.xs),
         Text(
-          rating.toStringAsFixed(1),
+          label,
           style: AppTypography.label
               .copyWith(color: onColour.withValues(alpha: 0.9)),
         ),
@@ -258,10 +264,8 @@ class CompactDishCard extends StatelessWidget {
                       style: AppTypography.secondary
                           .copyWith(fontWeight: FontWeight.w600)),
                   const Spacer(),
-                  Icon(Icons.star_rounded,
-                      size: 13, color: AppColors.primary),
-                  Text(dish.rating.toStringAsFixed(1),
-                      style: AppTypography.label),
+                  Icon(Icons.star_rounded, size: 13, color: AppColors.primary),
+                  Text(dish.ratingLabel, style: AppTypography.label),
                 ],
               ),
             ],

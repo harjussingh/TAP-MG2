@@ -43,8 +43,7 @@ class _NotificationSettingsScreenState
                   onPressed: () => Navigator.pop(context),
                   icon: Icon(Icons.arrow_back, color: AppColors.base),
                 ),
-                Text(S.t('notifications'),
-                    style: AppTypography.sectionHeading),
+                Text(S.t('notifications'), style: AppTypography.sectionHeading),
               ],
             ),
             Expanded(
@@ -61,7 +60,6 @@ class _NotificationSettingsScreenState
                         setState(() => settings.setPushNotifications(v)),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-
                   SettingsSectionLabel(S.t('notifyMeAbout')),
                   SettingsToggle(
                     icon: Icons.receipt_long_outlined,
@@ -82,7 +80,6 @@ class _NotificationSettingsScreenState
                         setState(() => settings.setPromotionAlerts(v)),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-
                   SettingsSectionLabel(S.t('soundAndVibration')),
                   SettingsToggle(
                     icon: Icons.volume_up_outlined,

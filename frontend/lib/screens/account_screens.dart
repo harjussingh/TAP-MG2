@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import '../models/bowl.dart';
+import '../models/dish.dart';
 import '../models/order.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_settings.dart';
@@ -10,101 +12,225 @@ import '../widgets/dish_card.dart';
 import '../widgets/name_prompt.dart';
 import '../widgets/state_views.dart';
 import 'account_detail_screens.dart';
+import 'auth_screen.dart';
 import 'bowl_builder_screen.dart';
+import 'cart_screen.dart';
 import 'edit_details_screen.dart';
 import 'order_tracking_screen.dart';
 import 'intro_screen.dart';
-import 'settings_screen.dart';
-import 'auth_screen.dart';
 import 'review_screen.dart';
+import 'settings_screen.dart';
 
-class HistoryScreen extends StatelessWidget {
+/// A member's orders come from their account; a guest's from the orders
+/// placed on this device.
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
+
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !AppScope.read(context).historyLoaded) _load();
+    });
+  }
+
+  Future<void> _load() async {
+    try {
+      await AppScope.read(context).loadHistory();
+      if (mounted) setState(() => _error = null);
+    } catch (e) {
+      if (mounted) setState(() => _error = errorMessage(e));
+    }
+  }
+
+  Future<void> _reorder(Order order) async {
+    final state = AppScope.read(context);
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final result = await state.reorder(order.id);
+      final skipped = result.skipped.isEmpty
+          ? ''
+          : ' ${result.skipped.join(', ')} ${result.skipped.length == 1 ? 'is' : 'are'} unavailable.';
+      messenger.showSnackBar(SnackBar(
+          content: Text('Added ${result.added} item'
+              '${result.added == 1 ? '' : 's'} to your cart.$skipped')));
+      navigator
+          .push(MaterialPageRoute<void>(builder: (_) => const CartScreen()));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(errorMessage(e))));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
     final state = AppScope.of(context);
 
+    if (!state.historyLoaded && _error == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null && state.history.isEmpty) {
+      return ErrorStateView(
+        title: "We couldn't load your orders",
+        message: _error!,
+        onRetry: _load,
+      );
+    }
     if (state.history.isEmpty) {
-      return const EmptyStateView(
+      return EmptyStateView(
         icon: Icons.receipt_long_outlined,
         title: "You haven't ordered yet",
-        message: 'Your past orders will appear here.',
+        message: state.isMember
+            ? 'Your past orders will appear here.'
+            : 'Orders you place on this device will appear here.',
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(AppSpacing.screenPadding),
-      itemCount: state.history.length,
-      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.cardGap),
-      itemBuilder: (context, index) {
-        final order = state.history[index];
-        return Container(
-          padding: const EdgeInsets.all(AppSpacing.cardPadding),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('#${order.id}', style: AppTypography.cardTitle),
-                  Text(formatPrice(order.total),
-                      style: AppTypography.cardTitle
-                          .copyWith(fontWeight: FontWeight.w700)),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                '${order.stage.title} \u00b7 ${order.type.label}'
-                '${order.tableNumber.isEmpty ? '' : ' \u00b7 Table ${order.tableNumber}'}',
-                style: AppTypography.secondary,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  OutlinedButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                          builder: (_) => OrderTrackingScreen(order: order)),
-                    ),
-                    child: const Text('Track'),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  if (order.rating == null)
-                    TextButton(
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        itemCount: state.history.length,
+        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.cardGap),
+        itemBuilder: (context, index) {
+          final order = state.history[index];
+          return Container(
+            padding: const EdgeInsets.all(AppSpacing.cardPadding),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(order.number, style: AppTypography.cardTitle),
+                    Text(formatCents(order.pricing.totalCents),
+                        style: AppTypography.cardTitle
+                            .copyWith(fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '${order.status.title} · ${order.placeLabel}',
+                  style: AppTypography.secondary,
+                ),
+                Text(
+                  order.items
+                      .map((l) =>
+                          l.quantity > 1 ? '${l.quantity} × ${l.name}' : l.name)
+                      .join(', '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.secondary,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    OutlinedButton(
                       onPressed: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                            builder: (_) => ReviewScreen(order: order)),
+                            builder: (_) => OrderTrackingScreen(order: order)),
                       ),
-                      child: const Text('Leave a review'),
-                    )
-                  else
-                    Row(
-                      children: [
-                        for (var i = 0; i < order.rating!; i++)
-                          Icon(Icons.star,
-                              size: 18, color: AppColors.primary),
-                      ],
+                      child: const Text('Track'),
                     ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
+                    if (state.isMember)
+                      OutlinedButton(
+                        onPressed: () => _reorder(order),
+                        child: const Text('Reorder'),
+                      ),
+                    if (order.canReview)
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                              builder: (_) => ReviewScreen(order: order)),
+                        ),
+                        child: const Text('Leave a review'),
+                      )
+                    else if (order.hasReview)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.star, size: 18, color: AppColors.primary),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text('Reviewed', style: AppTypography.secondary),
+                        ],
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
 
-/// Saved recipes are a member feature, so a guest sees a prompt rather than
-/// an empty list of something they cannot use.
-class SavedScreen extends StatelessWidget {
+/// Saved recipes are a member feature, so a guest never reaches this tab.
+class SavedScreen extends StatefulWidget {
   const SavedScreen({super.key});
+
+  @override
+  State<SavedScreen> createState() => _SavedScreenState();
+}
+
+class _SavedScreenState extends State<SavedScreen> {
+  bool _loaded = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    final state = AppScope.read(context);
+    if (!state.isMember) return;
+    try {
+      await state.loadSaved();
+      _error = null;
+    } catch (e) {
+      _error = errorMessage(e);
+    }
+    if (mounted) setState(() => _loaded = true);
+  }
+
+  /// A saved custom bowl reopens in the builder on its review step, so it
+  /// can be checked before it is sent; a saved menu dish goes straight in.
+  Future<void> _open(Bowl bowl, int index) async {
+    final state = AppScope.read(context);
+    if (bowl.item?.isCustomBowl ?? false) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+            builder: (_) => BowlBuilderScreen(startFrom: bowl)),
+      );
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await state.addRecipeToCart(state.savedRecipes[index].id);
+      messenger.showSnackBar(
+          SnackBar(content: Text('${bowl.displayName} added to your order')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(errorMessage(e))));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,6 +241,16 @@ class SavedScreen extends StatelessWidget {
     // their navigation. The check stays only as a guard.
     if (!state.isMember) return const SizedBox.shrink();
 
+    if (!_loaded && state.savedBowls.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null && state.savedBowls.isEmpty) {
+      return ErrorStateView(
+        title: "We couldn't load your recipes",
+        message: _error!,
+        onRetry: _load,
+      );
+    }
     if (state.savedBowls.isEmpty) {
       return const EmptyStateView(
         icon: Icons.bookmark_outline,
@@ -123,96 +259,98 @@ class SavedScreen extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(AppSpacing.screenPadding),
-      itemCount: state.savedBowls.length,
-      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.cardGap),
-      itemBuilder: (context, index) {
-        final bowl = state.savedBowls[index];
-        return Material(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            // Reopens the builder on its review step with a copy of this
-            // bowl, so the recipe can be checked and adjusted before it is
-            // sent rather than going straight into the cart unseen.
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => BowlBuilderScreen(startFrom: bowl),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.cardPadding),
-              child: Row(
-                children: [
-                  EmojiTile(
-                      emoji: '\u{1F963}', colour: AppColors.tileBlue, size: 56),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          bowl.displayName,
-                          style: AppTypography.cardTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        itemCount: state.savedBowls.length,
+        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.cardGap),
+        itemBuilder: (context, index) {
+          final bowl = state.savedBowls[index];
+          return Material(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              // Reopens the builder on its review step with a copy of this
+              // bowl, so the recipe can be checked and adjusted before it is
+              // sent rather than going straight into the cart unseen.
+              onTap: () => _open(bowl, index),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.cardPadding),
+                child: Row(
+                  children: [
+                    EmojiTile(
+                        emoji: foodEmoji(bowl.item?.name ?? 'bowl'),
+                        colour: AppColors.tileBlue,
+                        size: 56),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            bowl.displayName,
+                            style: AppTypography.cardTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(bowl.summary, style: AppTypography.secondary),
+                        ],
+                      ),
+                    ),
+                    Text(formatPrice(bowl.price),
+                        style: AppTypography.cardTitle
+                            .copyWith(fontWeight: FontWeight.w700)),
+                    // One trailing control, as before. Rename and Remove live
+                    // inside it rather than as two icons, which would crowd
+                    // the row and push the price off its edge.
+                    PopupMenuButton<String>(
+                      icon:
+                          Icon(Icons.more_vert, color: AppColors.textSecondary),
+                      tooltip: 'More',
+                      color: AppColors.card,
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.radiusCard),
+                      ),
+                      onSelected: (choice) => choice == 'rename'
+                          ? _renameSaved(context, state, index)
+                          : _removeSaved(context, state, index),
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: 'rename',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined,
+                                  size: 19, color: AppColors.base),
+                              const SizedBox(width: AppSpacing.md),
+                              Text('Rename', style: AppTypography.body),
+                            ],
+                          ),
                         ),
-                        Text(bowl.summary, style: AppTypography.secondary),
+                        PopupMenuItem(
+                          value: 'remove',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.delete_outline,
+                                  size: 19, color: AppColors.error),
+                              const SizedBox(width: AppSpacing.md),
+                              Text('Remove',
+                                  style: AppTypography.body
+                                      .copyWith(color: AppColors.error)),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                  Text(formatPrice(bowl.price),
-                      style: AppTypography.cardTitle
-                          .copyWith(fontWeight: FontWeight.w700)),
-                  // One trailing control, as before. Rename and Remove live
-                  // inside it rather than as two icons, which would crowd
-                  // the row and push the price off its edge.
-                  PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
-                    tooltip: 'More',
-                    color: AppColors.card,
-                    shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppSpacing.radiusCard),
-                    ),
-                    onSelected: (choice) => choice == 'rename'
-                        ? _renameSaved(context, state, index)
-                        : _removeSaved(context, state, index),
-                    itemBuilder: (_) => [
-                      PopupMenuItem(
-                        value: 'rename',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit_outlined,
-                                size: 19, color: AppColors.base),
-                            const SizedBox(width: AppSpacing.md),
-                            Text('Rename', style: AppTypography.body),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'remove',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.delete_outline,
-                                size: 19, color: AppColors.error),
-                            const SizedBox(width: AppSpacing.md),
-                            Text('Remove',
-                                style: AppTypography.body
-                                    .copyWith(color: AppColors.error)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -239,7 +377,13 @@ Future<void> _removeSaved(
     ),
   );
 
-  if (confirmed == true) state.removeSavedBowl(index);
+  if (confirmed != true || !context.mounted) return;
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    await state.removeSavedBowl(index);
+  } catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text(errorMessage(e))));
+  }
 }
 
 /// Renames a saved recipe in place.
@@ -253,19 +397,45 @@ Future<void> _renameSaved(
     initial: bowl.name.isEmpty ? bowl.suggestedName : bowl.name,
     title: 'Rename this recipe',
   );
-  if (name == null) return;
+  if (name == null || !context.mounted) return;
 
-  state.renameSavedBowl(index, name);
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    await state.renameSavedBowl(index, name);
+  } catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text(errorMessage(e))));
+  }
 }
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final state = AppScope.read(context);
+      if (!state.isMember) return;
+      try {
+        await state.loadLoyalty();
+      } catch (_) {
+        // The card falls back to the points on the profile.
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
     final state = AppScope.of(context);
     final member = state.isMember;
+    final profile = state.profile;
 
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.screenPadding),
@@ -275,27 +445,36 @@ class ProfileScreen extends StatelessWidget {
             CircleAvatar(
               radius: 28,
               backgroundColor: AppColors.primary,
-              child: Text(member ? (state.profile?.initial ?? 'M') : 'G',
+              child: Text(member ? (profile?.initial ?? 'M') : 'G',
                   style: AppTypography.sectionHeading),
             ),
             const SizedBox(width: AppSpacing.md),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(member ? (state.profile?.name ?? 'Member') : 'Guest',
-                    style: AppTypography.sectionHeading),
-                Text(member ? (state.profile?.email ?? 'Full access') : 'Limited access',
-                    style: AppTypography.secondary),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(member ? (profile?.name ?? 'Member') : 'Guest',
+                      style: AppTypography.sectionHeading),
+                  Text(
+                      member
+                          ? (profile?.email ?? 'Full access')
+                          : 'Limited access',
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.secondary),
+                ],
+              ),
             ),
           ],
         ),
         const SizedBox(height: AppSpacing.xl),
 
+        if (member && profile != null) _LoyaltyCard(state: state),
+
         // A guest has no profile record, so the app offers the upgrade
         // instead of showing account rows that would not work.
         if (!member)
           Container(
+            margin: const EdgeInsets.only(bottom: AppSpacing.lg),
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
               color: AppColors.tileCream,
@@ -305,12 +484,11 @@ class ProfileScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Keep your orders',
-                    style: AppTypography.cardTitle),
+                Text('Keep your orders', style: AppTypography.cardTitle),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Guest orders are not saved. Create an account to keep your '
-                  'history, save recipes and use member offers.',
+                  'Guest orders are only kept on this device. Create an '
+                  'account to keep your history, save recipes and earn points.',
                   style: AppTypography.secondary,
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -372,6 +550,64 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
+class _LoyaltyCard extends StatelessWidget {
+  const _LoyaltyCard({required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    SettingsScope.watch(context);
+    final loyalty = state.loyalty;
+    final points = loyalty?.points ?? state.profile!.loyaltyPoints;
+    final tier = loyalty?.tier ?? state.profile!.loyaltyTier;
+    final next = loyalty?.nextTier;
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.header,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('ROBOMOS POINTS',
+                    style: AppTypography.label.copyWith(
+                        color: AppColors.textSecondary, letterSpacing: 1.2)),
+                Text('$points',
+                    style: AppTypography.screenTitle
+                        .copyWith(color: Colors.white)),
+                if (next != null && loyalty != null)
+                  Text('${loyalty.pointsToNextTier} to ${_title(next)}',
+                      style: AppTypography.secondary
+                          .copyWith(color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+            ),
+            child: Text(_title(tier),
+                style:
+                    AppTypography.label.copyWith(color: AppColors.onPrimary)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _title(String word) =>
+    word.isEmpty ? word : '${word[0].toUpperCase()}${word.substring(1)}';
+
 void _open(BuildContext context, Widget screen) {
   Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
 }
@@ -380,14 +616,14 @@ void _open(BuildContext context, Widget screen) {
 /// the user inside the app as a guest would be wrong: they did not choose to
 /// continue as a guest, they chose to leave.
 Future<void> _confirmSignOut(BuildContext context) async {
-  final state = AppScope.of(context);
+  final state = AppScope.read(context);
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
       backgroundColor: AppColors.card,
       title: const Text('Log out?'),
       content: Text(
-        'You will be returned to the start. Anything in your cart is cleared.',
+        'You will be returned to the start. Your cart stays with your account.',
         style: AppTypography.body,
       ),
       actions: [
@@ -402,8 +638,9 @@ Future<void> _confirmSignOut(BuildContext context) async {
   );
 
   if (confirmed != true || !context.mounted) return;
-  state.signOut();
-  Navigator.of(context).pushAndRemoveUntil(
+  final navigator = Navigator.of(context);
+  await state.signOut();
+  navigator.pushAndRemoveUntil(
     MaterialPageRoute<void>(builder: (_) => const IntroScreen()),
     (route) => false,
   );

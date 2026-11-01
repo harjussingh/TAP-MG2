@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
-import '../data/sample_data.dart';
 import '../models/dish.dart';
 import '../models/order.dart';
 import '../theme/app_colors.dart';
@@ -16,6 +15,7 @@ import '../widgets/robomos_logo.dart';
 import '../widgets/state_views.dart';
 import 'cart_screen.dart';
 import 'dish_detail_screen.dart';
+import 'table_number_screen.dart';
 
 enum ViewState { loading, ready, error }
 
@@ -39,6 +39,7 @@ class _MenuScreenState extends State<MenuScreen> {
   MenuFilter _filter = MenuFilter.all;
   String _search = '';
   final TextEditingController _searchController = TextEditingController();
+  List<Dish> _dishes = const [];
 
   @override
   void initState() {
@@ -54,17 +55,30 @@ class _MenuScreenState extends State<MenuScreen> {
 
   Future<void> _load() async {
     setState(() => _state = ViewState.loading);
-    // TODO(api): api.menuItems() once the backend is reachable.
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
-    setState(() => _state = ViewState.ready);
+    final state = AppScope.read(context);
+    try {
+      final dishes = await state.loadMenu();
+      if (!mounted) return;
+      setState(() {
+        _dishes = dishes;
+        _state = ViewState.ready;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _state = ViewState.error);
+    }
+    // Keeps the cart badge right when the app comes back to the menu.
+    try {
+      await state.refreshCart();
+    } catch (_) {
+      // The badge is a convenience; the cart screen loads it again.
+    }
   }
 
   bool get _isBrowsing => _filter == MenuFilter.all && _search.trim().isEmpty;
 
   List<Dish> get _visible {
     final query = _search.trim().toLowerCase();
-    return kDishes.where((dish) {
+    return _dishes.where((dish) {
       if (!_filter.matches(dish)) return false;
       if (query.isEmpty) return true;
       return dish.name.toLowerCase().contains(query) ||
@@ -72,11 +86,24 @@ class _MenuScreenState extends State<MenuScreen> {
     }).toList();
   }
 
-  List<Dish> get _featured =>
-      kDishes.where((d) => d.inStock && !d.isCustom).take(4).toList();
+  /// The dishes the kitchen marks as featured lead, then the rest in menu
+  /// order, so the carousel opens on bowls rather than on a side or a drink.
+  List<Dish> get _featured {
+    final candidates = _dishes.where((d) => d.inStock && !d.isCustom).toList();
+    final featured = candidates.where((d) => d.item?.isFeatured ?? false);
+    final rest = candidates.where((d) => !(d.item?.isFeatured ?? false));
+    return [...featured, ...rest].take(4).toList();
+  }
+
+  Dish? get _customBowl {
+    for (final d in _dishes) {
+      if (d.isCustom) return d;
+    }
+    return null;
+  }
 
   List<Dish> get _popular {
-    final sorted = kDishes.where((d) => !d.isCustom).toList()
+    final sorted = _dishes.where((d) => !d.isCustom).toList()
       ..sort((a, b) => b.rating.compareTo(a.rating));
     return sorted.take(6).toList();
   }
@@ -90,7 +117,7 @@ class _MenuScreenState extends State<MenuScreen> {
       MaterialPageRoute<void>(
         builder: (_) => DishDetailScreen(
           dish: dish,
-          palette: _paletteFor(dish, kDishes.indexOf(dish)),
+          palette: _paletteFor(dish, _dishes.indexOf(dish)),
         ),
       ),
     );
@@ -103,7 +130,7 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _pickOrderType() async {
-    final state = AppScope.of(context);
+    final state = AppScope.read(context);
     final chosen = await showModalBottomSheet<OrderType>(
       context: context,
       backgroundColor: AppColors.card,
@@ -117,10 +144,10 @@ class _MenuScreenState extends State<MenuScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl,
-                  AppSpacing.lg, AppSpacing.sm),
-              child:
-                  Text('How are you ordering?', style: AppTypography.sectionHeading),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, AppSpacing.sm),
+              child: Text('How are you ordering?',
+                  style: AppTypography.sectionHeading),
             ),
             for (final type in OrderType.values)
               ListTile(
@@ -142,7 +169,21 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
       ),
     );
-    if (chosen != null && mounted) state.setOrderType(chosen);
+    if (chosen == null || chosen == state.orderType || !mounted) return;
+    try {
+      final done = await state.setOrderType(chosen);
+      if (!done && mounted) {
+        // Dine-in needs a table number first.
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const TableNumberScreen()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(errorMessage(e))));
+      }
+    }
   }
 
   @override
@@ -154,7 +195,7 @@ class _MenuScreenState extends State<MenuScreen> {
       bottom: false,
       child: Column(
         children: [
-          _BrandBar(cartCount: state.cart.length, onCartTap: _openCart),
+          _BrandBar(cartCount: state.cartCount, onCartTap: _openCart),
           Expanded(child: _body(state)),
         ],
       ),
@@ -167,14 +208,16 @@ class _MenuScreenState extends State<MenuScreen> {
         return ListView.separated(
           padding: const EdgeInsets.all(AppSpacing.screenPadding),
           itemCount: 4,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.cardGap),
+          separatorBuilder: (_, __) =>
+              const SizedBox(height: AppSpacing.cardGap),
           itemBuilder: (_, __) => const DishCardSkeleton(),
         );
 
       case ViewState.error:
         return ErrorStateView(
           title: "We couldn't load the menu",
-          message: 'Check your connection and try again.',
+          message: 'Check your connection and that the kitchen server is '
+              'running, then try again.',
           onRetry: _load,
         );
 
@@ -221,11 +264,13 @@ class _MenuScreenState extends State<MenuScreen> {
       const _Headline(),
       const SizedBox(height: AppSpacing.lg),
       SizedBox(
-        height: 300,
+        // The image is fixed; the words below it grow with the chosen text
+        // size, so the carousel does too (two-line name and description).
+        height: 218 + 100 * settings.textScale.factor,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.screenPadding),
+          padding:
+              const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
           itemCount: featured.length,
           separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
           itemBuilder: (context, i) {
@@ -249,8 +294,8 @@ class _MenuScreenState extends State<MenuScreen> {
         height: 172,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.screenPadding),
+          padding:
+              const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
           itemCount: popular.length,
           separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
           itemBuilder: (context, i) {
@@ -264,14 +309,16 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
       ),
       const SizedBox(height: AppSpacing.xl),
-      const _BuildYourOwnBanner(),
-      const SizedBox(height: AppSpacing.xl),
+      if (_customBowl != null) ...[
+        _BuildYourOwnBanner(bowl: _customBowl!),
+        const SizedBox(height: AppSpacing.xl),
+      ],
       _SectionHeading(
         title: 'The full menu',
-        actionLabel: '${kDishes.length} bowls',
+        actionLabel: _dishes.length == 1 ? '1 item' : '${_dishes.length} items',
       ),
       const SizedBox(height: AppSpacing.md),
-      for (final dish in kDishes)
+      for (final dish in _dishes)
         Padding(
           padding: const EdgeInsets.fromLTRB(AppSpacing.screenPadding, 0,
               AppSpacing.screenPadding, AppSpacing.cardGap),
@@ -308,7 +355,7 @@ class _MenuScreenState extends State<MenuScreen> {
       const SizedBox(height: AppSpacing.lg),
       _SectionHeading(
         title: _filter == MenuFilter.all ? 'Results' : _filter.label,
-        actionLabel: dishes.length == 1 ? '1 bowl' : '${dishes.length} bowls',
+        actionLabel: dishes.length == 1 ? '1 item' : '${dishes.length} items',
       ),
       const SizedBox(height: AppSpacing.md),
       for (final dish in dishes)
@@ -336,7 +383,7 @@ class _BrandBar extends StatelessWidget {
           AppSpacing.md, AppSpacing.screenPadding, AppSpacing.md),
       child: Row(
         children: [
-          RobomosLogo(size: 44, onDark: false),
+          const RobomosLogo(size: 44, onDark: false),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
@@ -396,11 +443,11 @@ class _CartButton extends StatelessWidget {
                 right: -2,
                 top: -2,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColors.error,
-                    borderRadius:
-                        BorderRadius.circular(AppSpacing.radiusPill),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
                     border: Border.all(color: AppColors.surface, width: 2),
                   ),
                   child: Text('$count',
@@ -435,8 +482,8 @@ class _OrderContextRow extends StatelessWidget {
         : orderType.label;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.screenPadding, 0,
-          AppSpacing.screenPadding, AppSpacing.md),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.screenPadding, 0, AppSpacing.screenPadding, AppSpacing.md),
       child: Semantics(
         button: true,
         label: 'Order type, $summary. Tap to change.',
@@ -449,8 +496,8 @@ class _OrderContextRow extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
-              border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.35)),
+              border:
+                  Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
             ),
             child: Row(
               children: [
@@ -496,8 +543,7 @@ class _SearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
       child: TextField(
         controller: controller,
         onChanged: onChanged,
@@ -542,8 +588,7 @@ class _Headline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -577,8 +622,7 @@ class _SectionHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
       child: Row(
         children: [
           Expanded(
@@ -608,16 +652,14 @@ class _SectionHeading extends StatelessWidget {
 /// The custom bowl is the product, so it gets a band of its own rather than
 /// sitting in the list as the sixth card down.
 class _BuildYourOwnBanner extends StatelessWidget {
-  const _BuildYourOwnBanner();
+  const _BuildYourOwnBanner({required this.bowl});
+
+  final Dish bowl;
 
   @override
   Widget build(BuildContext context) {
-    final bowl = kDishes.firstWhere((d) => d.isCustom,
-        orElse: () => kDishes.first);
-
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
       child: Material(
         color: AppColors.header,
         borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
@@ -662,8 +704,7 @@ class _BuildYourOwnBanner extends StatelessWidget {
                       Text(
                         'Six steps. The machine builds it exactly to spec.',
                         style: AppTypography.secondary.copyWith(
-                            color:
-                                AppColors.onHeader.withValues(alpha: 0.7)),
+                            color: AppColors.onHeader.withValues(alpha: 0.7)),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       Row(

@@ -32,7 +32,8 @@ enum DishPalette {
   /// A faint wash of the same hue, for the area the food image sits on.
   Color get wash => settings.darkMode
       ? Color.alphaBlend(_dark.withValues(alpha: 0.28), const Color(0xFF17150F))
-      : Color.alphaBlend(_light.withValues(alpha: 0.14), const Color(0xFFFFFFFF));
+      : Color.alphaBlend(
+          _light.withValues(alpha: 0.14), const Color(0xFFFFFFFF));
 
   static DishPalette fromKey(String? key) =>
       values.firstWhere((p) => p.key == key, orElse: () => DishPalette.teal);

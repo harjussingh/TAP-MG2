@@ -47,25 +47,21 @@ class _AppearanceScreenState extends State<AppearanceScreen> {
                 children: [
                   const DarkModeCard(),
                   const SizedBox(height: AppSpacing.xl),
-
                   SettingsSectionLabel(S.t('themeColour'),
                       trailing: settings.accent.label),
                   const SizedBox(height: AppSpacing.md),
                   _AccentRow(onPicked: () => setState(() {})),
                   const SizedBox(height: AppSpacing.xl),
-
                   SettingsSectionLabel(S.t('textSize'),
                       trailing: settings.textScale.label),
                   const SizedBox(height: AppSpacing.md),
                   _TextSizeRow(onPicked: () => setState(() {})),
                   const SizedBox(height: AppSpacing.xl),
-
                   SettingsSectionLabel(S.t('uiStyle'),
                       trailing: settings.uiStyle.label),
                   const SizedBox(height: AppSpacing.md),
                   _UiStyleRow(onPicked: () => setState(() {})),
                   const SizedBox(height: AppSpacing.xl),
-
                   SettingsSectionLabel(S.t('preview').toUpperCase()),
                   const SizedBox(height: AppSpacing.md),
                   const _Preview(),
@@ -121,8 +117,7 @@ class _AccentRow extends StatelessWidget {
                         ),
                       ),
                       child: accent == settings.accent
-                          ? Icon(Icons.check,
-                              size: 20, color: accent.onColour)
+                          ? Icon(Icons.check, size: 20, color: accent.onColour)
                           : null,
                     ),
                   ),
@@ -164,8 +159,7 @@ class _TextSizeRow extends StatelessWidget {
                     color: scale == settings.textScale
                         ? AppColors.primary.withValues(alpha: 0.14)
                         : AppColors.card,
-                    borderRadius:
-                        BorderRadius.circular(AppSpacing.radiusInput),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
                     border: Border.all(
                       color: scale == settings.textScale
                           ? AppColors.primary

@@ -77,8 +77,7 @@ class S {
       'account': '\u0916\u093e\u0924\u093e',
       'appearance': '\u0926\u093f\u0916\u093e\u0935\u091f',
       'language': '\u092d\u093e\u0937\u093e',
-      'notifications':
-          '\u0938\u0942\u091a\u0928\u093e\u090f\u0901',
+      'notifications': '\u0938\u0942\u091a\u0928\u093e\u090f\u0901',
       'darkMode': '\u0921\u093e\u0930\u094d\u0915 \u092e\u094b\u0921',
       'darkModeOn':
           '\u0930\u093e\u0924 \u092e\u0947\u0902 \u0906\u0902\u0916\u094b\u0902 \u0915\u0947 \u0932\u093f\u090f \u0906\u0930\u093e\u092e\u0926\u093e\u092f\u0915',
@@ -87,8 +86,10 @@ class S {
       'themeColour': '\u0925\u0940\u092e \u0930\u0902\u0917',
       'textSize':
           '\u091f\u0947\u0915\u094d\u0938\u094d\u091f \u0915\u093e \u0906\u0915\u093e\u0930',
-      'uiStyle': '\u092f\u0942\u0906\u0908 \u0938\u094d\u091f\u093e\u0907\u0932',
-      'preview': '\u092a\u0942\u0930\u094d\u0935\u093e\u0935\u0932\u094b\u0915\u0928',
+      'uiStyle':
+          '\u092f\u0942\u0906\u0908 \u0938\u094d\u091f\u093e\u0907\u0932',
+      'preview':
+          '\u092a\u0942\u0930\u094d\u0935\u093e\u0935\u0932\u094b\u0915\u0928',
       'changes': '\u092c\u0926\u0932\u093e\u0935',
       'change': '\u092c\u0926\u0932\u093e\u0935',
       'discard': '\u0930\u0926\u094d\u0926 \u0915\u0930\u0947\u0902',
@@ -99,8 +100,7 @@ class S {
           '\u092c\u0926\u0932\u093e\u0935 \u0926\u0947\u0916\u0947\u0902',
       'noChanges':
           '\u0905\u092d\u0940 \u0915\u0941\u091b \u0928\u0939\u0940\u0902 \u092c\u0926\u0932\u093e',
-      'keepChanges':
-          '\u092c\u0926\u0932\u093e\u0935 \u0930\u0916\u0947\u0902',
+      'keepChanges': '\u092c\u0926\u0932\u093e\u0935 \u0930\u0916\u0947\u0902',
       'pushNotifications':
           '\u092a\u0941\u0936 \u0938\u0942\u091a\u0928\u093e\u090f\u0901',
       'pushNotificationsHint':
@@ -111,7 +111,8 @@ class S {
           '\u0911\u0930\u094d\u0921\u0930 \u0905\u092a\u0921\u0947\u091f',
       'orderUpdatesHint':
           '\u091c\u092c \u0906\u092a\u0915\u093e \u092c\u093e\u0909\u0932 \u0924\u0948\u092f\u093e\u0930 \u0939\u094b',
-      'offers': '\u0911\u092b\u093c\u0930 \u0914\u0930 \u0916\u092c\u0930\u0947\u0902',
+      'offers':
+          '\u0911\u092b\u093c\u0930 \u0914\u0930 \u0916\u092c\u0930\u0947\u0902',
       'offersHint':
           '\u0928\u090f \u092c\u093e\u0909\u0932 \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u0915\u092d\u0940-\u0915\u092d\u0940 \u0908\u092e\u0947\u0932',
       'soundAndVibration':
@@ -190,7 +191,8 @@ class S {
     },
     'vi': {
       'settings': 'C\u00e0i \u0111\u1eb7t',
-      'settingsSubtitle': 'L\u00e0m cho \u1ee9ng d\u1ee5ng h\u1ee3p \u00fd b\u1ea1n',
+      'settingsSubtitle':
+          'L\u00e0m cho \u1ee9ng d\u1ee5ng h\u1ee3p \u00fd b\u1ea1n',
       'personalisation': 'C\u00c1 NH\u00c2N HO\u00c1',
       'alerts': 'TH\u00d4NG B\u00c1O',
       'account': 'T\u00c0I KHO\u1EA2N',
@@ -199,7 +201,8 @@ class S {
       'notifications': 'Th\u00f4ng b\u00e1o',
       'darkMode': 'Ch\u1ebf \u0111\u1ed9 t\u1ed1i',
       'darkModeOn': 'D\u1ec5 ch\u1ecbu cho m\u1eaft v\u00e0o ban \u0111\u00eam',
-      'darkModeOff': 'Ch\u1ea1m \u0111\u1ec3 chuy\u1ec3n sang ban \u0111\u00eam',
+      'darkModeOff':
+          'Ch\u1ea1m \u0111\u1ec3 chuy\u1ec3n sang ban \u0111\u00eam',
       'themeColour': 'M\u00c0U CH\u1EE6 \u0110\u1EA0O',
       'textSize': 'C\u1EE0 CH\u1EEE',
       'uiStyle': 'KI\u1EC2U GIAO DI\u1EC6N',
@@ -214,7 +217,8 @@ class S {
       'noChanges': 'Ch\u01b0a c\u00f3 thay \u0111\u1ed5i n\u00e0o',
       'keepChanges': 'Gi\u1eef thay \u0111\u1ed5i',
       'pushNotifications': 'Th\u00f4ng b\u00e1o \u0111\u1ea9y',
-      'pushNotificationsHint': '\u0110ang b\u1eadt tr\u00ean thi\u1ebft b\u1ecb n\u00e0y',
+      'pushNotificationsHint':
+          '\u0110ang b\u1eadt tr\u00ean thi\u1ebft b\u1ecb n\u00e0y',
       'notifyMeAbout': 'TH\u00d4NG B\u00c1O V\u1EC0',
       'orderUpdates': 'C\u1eadp nh\u1eadt \u0111\u01a1n h\u00e0ng',
       'orderUpdatesHint': 'Khi m\u00f3n c\u1ee7a b\u1ea1n s\u1eb5n s\u00e0ng',

@@ -6,7 +6,8 @@ import '../theme/app_settings.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 
-/// Dietary preferences filter the menu and warn on allergens.
+/// Dietary preferences filter the menu and warn on allergens. They are saved
+/// to the account, as the API's dietary preferences and allergens.
 class DietaryPreferencesScreen extends StatefulWidget {
   const DietaryPreferencesScreen({super.key});
 
@@ -16,17 +17,40 @@ class DietaryPreferencesScreen extends StatefulWidget {
 }
 
 class _DietaryPreferencesScreenState extends State<DietaryPreferencesScreen> {
+  /// Label, whether it is an allergen (rather than a diet), and API value.
   static const _options = [
-    'Vegetarian',
-    'Vegan',
-    'Gluten free',
-    'Dairy free',
-    'Nut allergy',
-    'Shellfish allergy',
+    ('Vegetarian', false, 'vegetarian'),
+    ('Vegan', false, 'vegan'),
+    ('Gluten free', false, 'gluten_free'),
+    ('Dairy free', false, 'dairy_free'),
+    ('Nut allergy', true, 'peanut'),
+    ('Shellfish allergy', true, 'shellfish'),
   ];
 
-  late final Set<String> _selected =
-      Set<String>.from(AppScope.of(context).profile?.dietary ?? <String>{});
+  late final Set<String> _dietary =
+      Set<String>.from(AppScope.read(context).profile?.dietary ?? <String>{});
+  late final Set<String> _allergens =
+      Set<String>.from(AppScope.read(context).profile?.allergens ?? <String>{});
+  bool _busy = false;
+
+  Set<String> _setFor(bool allergen) => allergen ? _allergens : _dietary;
+
+  Future<void> _save() async {
+    setState(() => _busy = true);
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await AppScope.read(context)
+          .updateProfile(dietary: _dietary, allergens: _allergens);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Preferences saved')),
+      );
+      navigator.pop();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(errorMessage(e))));
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,45 +67,36 @@ class _DietaryPreferencesScreenState extends State<DietaryPreferencesScreen> {
             style: AppTypography.secondary,
           ),
           const SizedBox(height: AppSpacing.lg),
-          for (final option in _options)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Material(
+          for (final (label, allergen, value) in _options)
+            Container(
+              margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+              decoration: BoxDecoration(
                 color: AppColors.card,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-                clipBehavior: Clip.antiAlias,
-                child: CheckboxListTile(
-                  value: _selected.contains(option),
-                  activeColor: AppColors.primary,
-                  checkColor: AppColors.onPrimary,
-                  title: Text(option, style: AppTypography.body),
-                  onChanged: (on) => setState(() {
-                    if (on ?? false) {
-                      _selected.add(option);
-                    } else {
-                      _selected.remove(option);
-                    }
-                  }),
-                ),
+              ),
+              child: CheckboxListTile(
+                value: _setFor(allergen).contains(value),
+                activeColor: AppColors.primary,
+                checkColor: AppColors.onPrimary,
+                title: Text(label, style: AppTypography.body),
+                onChanged: (on) => setState(() {
+                  if (on ?? false) {
+                    _setFor(allergen).add(value);
+                  } else {
+                    _setFor(allergen).remove(value);
+                  }
+                }),
               ),
             ),
           const SizedBox(height: AppSpacing.lg),
           ElevatedButton(
-            onPressed: () {
-              final state = AppScope.of(context);
-              final profile = state.profile;
-              if (profile != null) {
-                profile.dietary
-                  ..clear()
-                  ..addAll(_selected);
-                state.updateProfile(profile);
-              }
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Preferences saved')),
-              );
-              Navigator.pop(context);
-            },
-            child: const Text('Save preferences'),
+            onPressed: _busy ? null : _save,
+            child: _busy
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Save preferences'),
           ),
         ],
       ),
@@ -97,18 +112,20 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  late bool _orders = AppScope.of(context).profile?.orderUpdates ?? true;
+  late bool _orders = AppScope.read(context).profile?.orderUpdates ?? true;
   late bool _marketing =
-      AppScope.of(context).profile?.marketingEmails ?? false;
+      AppScope.read(context).profile?.marketingEmails ?? false;
 
-  void _persist() {
-    final state = AppScope.of(context);
-    final profile = state.profile;
-    if (profile != null) {
-      profile
-        ..orderUpdates = _orders
-        ..marketingEmails = _marketing;
-      state.updateProfile(profile);
+  /// Offers and news is the account's marketing opt-in, so it is saved to
+  /// the server; order updates are a setting on this device.
+  Future<void> _setMarketing(bool value) async {
+    setState(() => _marketing = value);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await AppScope.read(context).updateProfile(marketing: value);
+    } catch (e) {
+      if (mounted) setState(() => _marketing = !value);
+      messenger.showSnackBar(SnackBar(content: Text(errorMessage(e))));
     }
   }
 
@@ -125,19 +142,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             title: 'Order updates',
             subtitle: 'Tells you when your bowl is ready for collection.',
             value: _orders,
-            onChanged: (v) => setState(() {
-              _orders = v;
-              _persist();
-            }),
+            onChanged: (v) {
+              setState(() => _orders = v);
+              AppScope.read(context).setOrderUpdates(v);
+            },
           ),
           _Switch(
             title: 'Offers and news',
             subtitle: 'Occasional emails about new bowls and member offers.',
             value: _marketing,
-            onChanged: (v) => setState(() {
-              _marketing = v;
-              _persist();
-            }),
+            onChanged: _setMarketing,
           ),
         ],
       ),
@@ -161,21 +175,19 @@ class _Switch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Material(
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
-        clipBehavior: Clip.antiAlias,
-        child: SwitchListTile(
-          value: value,
-          onChanged: onChanged,
-          activeThumbColor: AppColors.primary,
-          title: Text(title, style: AppTypography.body),
-          subtitle: Text(subtitle, style: AppTypography.secondary),
-        ),
+      ),
+      child: SwitchListTile(
+        value: value,
+        onChanged: onChanged,
+        activeThumbColor: AppColors.primary,
+        title: Text(title, style: AppTypography.body),
+        subtitle: Text(subtitle, style: AppTypography.secondary),
       ),
     );
   }
 }
-

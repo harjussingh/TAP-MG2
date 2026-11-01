@@ -6,11 +6,11 @@ import '../theme/app_colors.dart';
 import '../theme/app_settings.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
-import '../widgets/dish_card.dart';
 import 'order_confirmed_screen.dart';
 
-/// Payment is simulated for this phase and is labelled as such on screen so
-/// no reviewer mistakes it for a live facility.
+/// Places the order on the server. Card payments are simulated while the
+/// backend runs with PAYMENT_PROVIDER=mock, and the screen says so, so no
+/// reviewer mistakes it for a live facility.
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
 
@@ -23,125 +23,252 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// Apple Pay, Google Pay, PayPal and Afterpay are not implemented
   /// server-side, so they are not offered here.
   static const _methods = [
-    ('card', 'Card', Icons.credit_card),
-    ('cash', 'Cash', Icons.payments_outlined),
-    ('pay_at_counter', 'Pay at counter', Icons.point_of_sale),
+    (PaymentMethod.card, Icons.credit_card),
+    (PaymentMethod.cash, Icons.payments_outlined),
+    (PaymentMethod.payAtCounter, Icons.point_of_sale),
   ];
+
+  final _formKey = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _email = TextEditingController();
 
   int _selected = 0;
   bool _processing = false;
+  bool _usePoints = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final state = AppScope.read(context);
+      if (!state.isMember) return;
+      try {
+        await state.loadLoyalty();
+      } catch (_) {
+        // Points are optional; checkout works without them.
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    super.dispose();
+  }
 
   Future<void> _placeOrder() async {
-    setState(() => _processing = true);
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-    final order = AppScope.of(context).placeOrder();
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => OrderConfirmedScreen(order: order)),
-    );
+    if (!(_formKey.currentState?.validate() ?? true)) return;
+    final state = AppScope.read(context);
+    setState(() {
+      _processing = true;
+      _error = null;
+    });
+    try {
+      final loyalty = state.loyalty;
+      final order = await state.checkout(
+        method: _methods[_selected].$1,
+        name: state.isMember ? null : _name.text.trim(),
+        email: state.isMember ? null : _email.text.trim(),
+        redeemPoints: _usePoints && loyalty != null ? loyalty.points : 0,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+            builder: (_) => OrderConfirmedScreen(order: order)),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _processing = false;
+          _error = errorMessage(e);
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     SettingsScope.watch(context);
     final state = AppScope.of(context);
-    final total = state.cartTotal;
+    final totals = state.cart?.totals;
+    final total = totals?.totalCents ?? 0;
+    final loyalty = state.loyalty;
+    final canRedeem = state.isMember &&
+        loyalty != null &&
+        loyalty.points >= loyalty.minPointsToRedeem;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(title: const Text('Checkout')),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: AppColors.tileCream,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
-              border: Border.all(color: AppColors.primary),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.science_outlined, color: AppColors.primary),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    'Demo payment \u2014 simulation only. No real charges are made.',
-                    style: AppTypography.secondary
-                        .copyWith(color: AppColors.base),
-                  ),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
+          children: [
+            if (_methods[_selected].$1 == PaymentMethod.card)
+              Container(
+                margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: AppColors.tileCream,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusInput),
+                  border: Border.all(color: AppColors.primary),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          _Panel(
-            label: 'ORDER SUMMARY',
-            child: Column(
-              children: [
-                for (final line in state.cart)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                            child: Text(line.title, style: AppTypography.body)),
-                        Text(formatPrice(line.price),
-                            style: AppTypography.body),
-                      ],
-                    ),
-                  ),
-                const Divider(height: AppSpacing.xl),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Row(
                   children: [
-                    Text('Total',
-                        style: AppTypography.cardTitle
-                            .copyWith(fontWeight: FontWeight.w700)),
-                    Text(formatPrice(total),
-                        style: AppTypography.cardTitle
-                            .copyWith(fontWeight: FontWeight.w700)),
+                    Icon(Icons.science_outlined, color: AppColors.primary),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        'Demo payment — simulation only. No real charges are made.',
+                        style: AppTypography.secondary
+                            .copyWith(color: AppColors.base),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Includes GST ${formatPrice(total / 11)}',
-                      style: AppTypography.secondary),
-                ),
-              ],
-            ),
-          ),
-          _Panel(
-            label: 'PAYMENT METHOD',
-            child: Column(
-              children: [
-                for (var i = 0; i < _methods.length; i++)
-                  _MethodRow(
-                    label: _methods[i].$2,
-                    icon: _methods[i].$3,
-                    selected: i == _selected,
-                    onTap: () => setState(() => _selected = i),
-                  ),
-              ],
-            ),
-          ),
-          if (state.orderType == OrderType.dineIn &&
-              state.tableNumber.isNotEmpty)
+              ),
             _Panel(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              label: 'ORDER SUMMARY',
+              child: Column(
                 children: [
-                  Text('Table', style: AppTypography.body),
-                  Text('Table ${state.tableNumber}',
-                      style: AppTypography.body
-                          .copyWith(fontWeight: FontWeight.w700)),
+                  for (final line in state.cartLines)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                              child: Text(
+                                  line.quantity > 1
+                                      ? '${line.quantity} × ${line.name}'
+                                      : line.name,
+                                  style: AppTypography.body)),
+                          Text(formatCents(line.lineTotalCents),
+                              style: AppTypography.body),
+                        ],
+                      ),
+                    ),
+                  const Divider(height: AppSpacing.xl),
+                  if (totals != null) ...[
+                    _Line(label: 'Subtotal', cents: totals.subtotalCents),
+                    if (totals.discountCents > 0)
+                      _Line(
+                          label: 'Points discount',
+                          cents: -totals.discountCents),
+                    _Line(label: 'GST', cents: totals.taxCents),
+                    if (totals.serviceFeeCents > 0)
+                      _Line(
+                          label: 'Service fee', cents: totals.serviceFeeCents),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Total',
+                          style: AppTypography.cardTitle
+                              .copyWith(fontWeight: FontWeight.w700)),
+                      Text(formatCents(total),
+                          style: AppTypography.cardTitle
+                              .copyWith(fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  if (_usePoints)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                          'Points come off the total when the order is placed',
+                          style: AppTypography.secondary),
+                    ),
                 ],
               ),
             ),
-          const SizedBox(height: AppSpacing.xxxl),
-        ],
+            // A guest has no account, so the kitchen needs a name to call out.
+            if (!state.isMember)
+              _Panel(
+                label: 'YOUR DETAILS',
+                child: Column(
+                  children: [
+                    TextFormField(
+                      controller: _name,
+                      style: AppTypography.body,
+                      textCapitalization: TextCapitalization.words,
+                      decoration:
+                          const InputDecoration(hintText: 'Name for the order'),
+                      validator: (v) => (v ?? '').trim().isEmpty
+                          ? 'Enter a name for the order'
+                          : null,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextFormField(
+                      controller: _email,
+                      style: AppTypography.body,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                          hintText: 'Email for the receipt (optional)'),
+                      validator: (v) {
+                        final value = (v ?? '').trim();
+                        if (value.isEmpty) return null;
+                        return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                                .hasMatch(value)
+                            ? null
+                            : 'That does not look like an email address';
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            if (canRedeem)
+              _Panel(
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _usePoints,
+                  activeThumbColor: AppColors.primary,
+                  onChanged: (v) => setState(() => _usePoints = v),
+                  title: Text('Use my ${loyalty.points} points',
+                      style: AppTypography.body),
+                  subtitle: Text(
+                      'Worth up to ${formatCents(loyalty.redeemableValueCents)}',
+                      style: AppTypography.secondary),
+                ),
+              ),
+            _Panel(
+              label: 'PAYMENT METHOD',
+              child: Column(
+                children: [
+                  for (var i = 0; i < _methods.length; i++)
+                    _MethodRow(
+                      label: _methods[i].$1.label,
+                      icon: _methods[i].$2,
+                      selected: i == _selected,
+                      onTap: () => setState(() => _selected = i),
+                    ),
+                ],
+              ),
+            ),
+            if (state.orderType == OrderType.dineIn &&
+                state.tableNumber.isNotEmpty)
+              _Panel(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Table', style: AppTypography.body),
+                    Text('Table ${state.tableNumber}',
+                        style: AppTypography.body
+                            .copyWith(fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            if (_error != null)
+              Text(_error!,
+                  style:
+                      AppTypography.secondary.copyWith(color: AppColors.error)),
+            const SizedBox(height: AppSpacing.xxxl),
+          ],
+        ),
       ),
       bottomNavigationBar: SafeArea(
         child: Container(
@@ -152,21 +279,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           child: Row(
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(formatPrice(total), style: AppTypography.cardTitle),
-                  Text('via ${_methods[_selected].$2}',
-                      style: AppTypography.secondary),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(formatCents(total), style: AppTypography.cardTitle),
+                    Text('via ${_methods[_selected].$1.label}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.secondary),
+                  ],
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: AppSpacing.sm),
               SizedBox(
                 width: 180,
                 child: ElevatedButton(
-                  // Disabled while the simulated payment runs.
-                  onPressed: _processing ? null : _placeOrder,
+                  // Disabled while the order is being placed.
+                  onPressed: _processing || state.cartLines.isEmpty
+                      ? null
+                      : _placeOrder,
                   child: _processing
                       ? const SizedBox(
                           width: 20,
@@ -178,6 +311,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _Line extends StatelessWidget {
+  const _Line({required this.label, required this.cents});
+
+  final String label;
+  final int cents;
+
+  @override
+  Widget build(BuildContext context) {
+    SettingsScope.watch(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppTypography.secondary),
+          Text(cents < 0 ? '-${formatCents(-cents)}' : formatCents(cents),
+              style: AppTypography.secondary),
+        ],
       ),
     );
   }
@@ -248,8 +404,7 @@ class _MethodRow extends StatelessWidget {
             Icon(icon, size: 22, color: AppColors.base),
             const SizedBox(width: AppSpacing.md),
             Expanded(child: Text(label, style: AppTypography.body)),
-            if (selected)
-              Icon(Icons.check, color: AppColors.primary, size: 20),
+            if (selected) Icon(Icons.check, color: AppColors.primary, size: 20),
           ],
         ),
       ),

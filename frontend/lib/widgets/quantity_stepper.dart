@@ -66,8 +66,8 @@ class QuantityStepper extends StatelessWidget {
             alignment: Alignment.center,
             child: Text(
               '$value',
-              style: AppTypography.body.copyWith(
-                  fontWeight: FontWeight.w700, color: ink),
+              style: AppTypography.body
+                  .copyWith(fontWeight: FontWeight.w700, color: ink),
             ),
           ),
           _Button(
