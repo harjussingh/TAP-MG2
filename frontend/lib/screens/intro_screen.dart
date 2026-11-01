@@ -121,7 +121,7 @@ class _IntroScreenState extends State<IntroScreen>
                 0.28,
                 Text(
                   'Tell us your table number, build your bowl, '
-                  'and watch the Fishbowl make it fresh.',
+                  'and watch the Robomos make it fresh.',
                   textAlign: TextAlign.center,
                   style: AppTypography.secondary
                       .copyWith(color: AppColors.textSecondary),
